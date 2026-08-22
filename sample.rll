@@ -1,0 +1,6 @@
+(* Generic motor starter sample — not plant logic *)
+XIC(Start_PB)XIO(Stop_PB)XIO(Fault)OTE(Motor_Run);
+XIC(Motor_Run)TON(Motor_Tmr,5000,0);
+XIC(Motor_Tmr.DN)OTE(Ready);
+XIC(Motor_Run)[OTE(Output_A),OTE(Output_B)];
+XIC(EStop_OK)XIO(Guard_Open)OTE(Permissive);

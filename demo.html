@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>L5X Ladder Studio — Sample</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+        <div><strong>L5X Ladder Studio</strong><small>Sample motor starter · Neutral Text → LD</small></div>
+      </div>
+      <div class="top-actions">
+        <span id="fileBadge" class="file-badge">샘플 RLL 자동 로드</span>
+        <button id="textImportBtn" class="button dark">RLL 텍스트 → LD</button>
+        <label class="button primary" for="fileInput">L5X 열기</label>
+        <input id="fileInput" type="file" accept=".l5x,.xml,text/xml" hidden>
+        <a class="button ghost" href="index.html">스튜디오</a>
+      </div>
+    </header>
+    <div class="workspace">
+      <aside class="sidebar">
+        <section class="import-card" id="dropZone">
+          <div class="upload-icon" aria-hidden="true">⇧</div>
+          <strong>L5X 프로젝트 가져오기</strong>
+          <span>샘플 대신 실제 프로젝트를 보려면 파일을 여세요.</span>
+        </section>
+        <div id="projectSummary" class="summary-grid" hidden>
+          <div><b id="routineCount">0</b><span>루틴</span></div>
+          <div><b id="rungCount">0</b><span>Rung</span></div>
+          <div><b id="tagCount">0</b><span>태그</span></div>
+        </div>
+        <div class="search-wrap">
+          <span aria-hidden="true">⌕</span>
+          <input id="searchInput" type="search" placeholder="프로그램 또는 루틴 검색" aria-label="루틴 검색" disabled>
+        </div>
+        <nav id="routineTree" class="routine-tree" aria-label="프로젝트 루틴">
+          <div class="empty-side">샘플이 자동으로 변환됩니다.</div>
+        </nav>
+      </aside>
+      <main class="main-panel">
+        <div id="welcome" class="welcome" hidden></div>
+        <section id="viewer" class="viewer">
+          <div class="viewer-head">
+            <div class="breadcrumb" id="breadcrumb">Sample / Motor_Starter</div>
+            <div class="viewer-title-row">
+              <div>
+                <div class="title-line"><h1 id="routineTitle">Motor_Starter</h1><span id="typeBadge" class="type-badge">RLL</span></div>
+                <p id="routineMeta">샘플 5 Rung</p>
+              </div>
+              <div class="export-actions">
+                <button id="exportSvg" class="button ghost">SVG</button>
+                <button id="exportTxt" class="button ghost">TXT</button>
+                <button id="printBtn" class="button ghost">인쇄 · PDF</button>
+              </div>
+            </div>
+            <div class="tabs" role="tablist">
+              <button class="tab active" data-tab="ladder" role="tab">Ladder</button>
+              <button class="tab" data-tab="source" role="tab">원본 로직</button>
+              <button class="tab" data-tab="report" role="tab">변환 리포트 <span id="warningCount"></span></button>
+            </div>
+          </div>
+          <div id="ladderPanel" class="tab-panel">
+            <div class="ladder-toolbar">
+              <label>확대 <input id="zoomRange" type="range" min="60" max="150" value="100"><output id="zoomValue">100%</output></label>
+              <label class="toggle"><input id="showRaw" type="checkbox"><span></span>명령어 표시</label>
+              <span id="conversionBadge" class="conversion-badge"></span>
+            </div>
+            <div id="ladderCanvas" class="ladder-canvas"></div>
+          </div>
+          <div id="sourcePanel" class="tab-panel source-panel" hidden><pre id="sourceCode"></pre></div>
+          <div id="reportPanel" class="tab-panel report-panel" hidden></div>
+        </section>
+      </main>
+    </div>
+  </div>
+  <dialog id="textDialog" class="text-dialog">
+    <form method="dialog" id="textLogicForm">
+      <header>
+        <div><strong>RLL 텍스트를 LD로 변환</strong><span>Rockwell Neutral Text(RLL)를 붙여 넣으세요.</span></div>
+        <button type="button" id="textDialogClose" class="dialog-close" aria-label="닫기">×</button>
+      </header>
+      <div class="dialog-fields">
+        <label>루틴 이름
+          <input id="textRoutineName" value="Text_Logic" maxlength="80">
+        </label>
+      </div>
+      <label class="logic-input-label">로직 원문
+        <textarea id="textLogicInput" spellcheck="false"></textarea>
+      </label>
+      <footer>
+        <span>입력 내용은 브라우저 밖으로 전송되지 않습니다.</span>
+        <button type="button" id="textConvertBtn" class="button primary">LD로 변환</button>
+      </footer>
+    </form>
+  </dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script>
+    window.LD_PRELOAD = {
+      name: 'Motor_Starter',
+      source: [
+        'XIC(Start_PB)XIO(Stop_PB)XIO(Fault)OTE(Motor_Run);',
+        'XIC(Motor_Run)TON(Motor_Tmr,5000,0);',
+        'XIC(Motor_Tmr.DN)OTE(Ready);',
+        'XIC(Motor_Run)[OTE(Output_A),OTE(Output_B)];',
+        'XIC(EStop_OK)XIO(Guard_Open)OTE(Permissive);'
+      ].join('\n')
+    };
+  </script>
+  <script src="app.js"></script>
+</body>
+</html>
