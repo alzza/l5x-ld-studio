@@ -147,8 +147,8 @@
       const block = node && (timerOps.has(node.op) || compareOps.has(node.op) || (!contactOps.has(node.op) && !outputOps.has(node.op)));
       const longest = Math.max(node?.op.length || 3, ...(node?.args || []).map(a => a.length));
       return block
-        ? {w:Math.min(300,Math.max(178,longest*7+76)),h:Math.max(84,52+(node?.args.length||0)*20)}
-        : {w:Math.min(320,Math.max(116,longest*7+44)),h:72};
+        ? {w:Math.max(178,longest*7+76),h:Math.max(84,52+(node?.args.length||0)*20)}
+        : {w:Math.max(116,longest*7+44),h:72};
     }
     if (node.type === 'sequence') {
       const ms = node.children.map(measure);
@@ -161,7 +161,9 @@
 
   function renderRung(rung, index, viewportWidth = 900) {
     const parser = new RLLParser(rung.text); const ast = parser.parse(); const m = measure(ast);
-    const W = Math.max(1040,Math.min(1320,Math.max(viewportWidth,m.w+190)));
+    // Never cap the natural width: a long tag must remain readable and its
+    // connecting wire must have room on both sides of a function block.
+    const W = Math.max(1040,viewportWidth,m.w+190);
     const H = Math.max(118, m.h + 54), y = 42;
     const railL=72,railR=W-22,nodeL=104,nodeR=W-56,drawW=nodeR-nodeL;
     const parts = [`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Rung ${esc(rung.number)} ladder diagram">`, svgDefs(), `<text class="rung-index" x="18" y="${y+4}">${esc(rung.number)}</text><line class="rail" x1="${railL}" y1="0" x2="${railL}" y2="${H}"/><line class="rail" x1="${railR}" y1="0" x2="${railR}" y2="${H}"/>`];
@@ -215,7 +217,7 @@
     }
   }
   function renderInstruction(n, x, cy, width, out) {
-    const cx=x+width/2, label=short(n.args[0] || '', 52), wireL=x+8, wireR=x+width-8, active=instructionActive(n), live=active?' active':'';
+    const cx=x+width/2, label=String(n.args[0] || ''), wireL=x+8, wireR=x+width-8, active=instructionActive(n), live=active?' active':'';
     out.push(`<line class="wire${live}" x1="${x}" y1="${cy}" x2="${wireL}" y2="${cy}"/><line class="wire${live}" x1="${wireR}" y1="${cy}" x2="${x+width}" y2="${cy}"/>`);
     if (n.op==='XIC'||n.op==='XIO') {
       out.push(`<title>${esc(n.raw)}</title><text class="label" x="${cx}" y="${cy-17}">${esc(label)}</text><line class="device${live}" x1="${cx-10}" y1="${cy-12}" x2="${cx-10}" y2="${cy+12}"/><line class="device${live}" x1="${cx+10}" y1="${cy-12}" x2="${cx+10}" y2="${cy+12}"/>`);
@@ -232,15 +234,13 @@
     const m=measure(n), bh=Math.min(m.h-8,Math.max(54,30+n.args.length*21)), bw=Math.min(width-18,Math.max(138,m.w-20)), bx=cx-bw/2, by=cy-bh/2;
     const known=contactOps.has(n.op)||compareOps.has(n.op)||timerOps.has(n.op)||outputOps.has(n.op)||instructionNames[n.op];
     out.push(`<title>${esc(instructionNames[n.op]||n.op)} · ${esc(n.raw)}</title><rect class="block ${known?'':'unknown'}" x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="1"/><text class="op mnemonic" x="${cx}" y="${by+13}">${esc(n.op)}</text><line class="divider" x1="${bx}" y1="${by+19}" x2="${bx+bw}" y2="${by+19}"/>`);
-    n.args.slice(0,6).forEach((a,i)=>{const label=(operandNames[n.op]||[])[i]||(i?`Operand ${i+1}`:'Operand');const yy=by+35+i*21;out.push(`<text class="arg-label" x="${bx+7}" y="${yy}">${esc(label)}</text><text class="arg-value" x="${bx+bw-7}" y="${yy}">${esc(short(a,Math.max(8,Math.floor((bw-62)/5.5))))}</text>`)});
+    n.args.slice(0,6).forEach((a,i)=>{const label=(operandNames[n.op]||[])[i]||(i?`Operand ${i+1}`:'Operand');const yy=by+35+i*21;out.push(`<text class="arg-label" x="${bx+7}" y="${yy}">${esc(label)}</text><text class="arg-value" x="${bx+bw-7}" y="${yy}">${esc(String(a))}</text>`)});
     out.push(`<line class="wire" x1="${wireL}" y1="${cy}" x2="${bx}" y2="${cy}"/><line class="wire" x1="${bx+bw}" y1="${cy}" x2="${wireR}" y2="${cy}"/>`);
   }
   function instructionActive(n){
     const key=n.args[0]; if(!key||!Object.prototype.hasOwnProperty.call(state.tagValues,key))return false;
     const value=!!state.tagValues[key]; return n.op==='XIO'?!value:value;
   }
-  function short(s,n){return s.length>n?s.slice(0,n-1)+'…':s;}
-
   function splitRLLText(source){
     const rungs=[];let start=0,depth=0,quote='';
     for(let i=0;i<source.length;i++){
