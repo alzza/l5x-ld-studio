@@ -21,12 +21,27 @@ L5X가 없어도 **RLL 텍스트 → LD**에 Rockwell Neutral Text를 붙여 넣
 XIC(Start_PB)XIO(Stop_PB)OTE(Motor_Run);
 ```
 
+## 최근 변경 기능
+
+전체 변경 내역은 [`CHANGELOG.md`](CHANGELOG.md)에 기록했습니다.
+
+- Rockwell Logix Designer 인쇄물에 가까운 Routine 전체 시트 레이아웃
+- 첫 Branch는 주 수평선에 유지하고 병렬·중첩 Branch는 아래 방향으로 확장
+- XIC/XIO/OTE/OTL/OTU 접점·코일 기호와 좌우 전원 레일 개선
+- Rung 번호, Page, 날짜, Routine 정보, `(End)` 표시 추가
+- MOV/TON/EQU 등 Function 블록의 Source·Dest·Timer·Preset·Accum 전체 태그 보존
+- 긴 태그의 `…` 생략 제거 및 태그 길이에 따른 블록·Rung 자연 폭 확장
+- 블록 좌우 연결선이 명령 상자에서 잘리지 않도록 자연 폭 계산
+- `L5XLadder.setTagValues({...})`로 XIC/XIO/코일 활성 상태를 녹색으로 표시
+- 화면·SVG·인쇄/PDF가 같은 래더 좌표를 사용
+
 ## 지원
 
 - RLL: 직렬 명령, 중첩 병렬 분기, XIC/XIO, OTE/OTL/OTU, ONS/OSR/OSF, 타이머·카운터·비교·이동·호출 계열
 - ST / SFC: LD로 변환하지 않고 원문·원본 XML을 그대로 표시
 - 내보내기: SVG, TXT, 브라우저 인쇄/PDF
-- 레이아웃: 입력 접점은 좌측, 최종 출력·타이머·JSR은 우측 레일, 창 폭에 맞춤
+- 레이아웃: Rockwell 매뉴얼 기준의 수평 주선·하향 Branch·연속 전원 레일
+- 태그 표시: 원문 전체를 보존하며 임의 생략하지 않음
 
 ## 정확도
 
