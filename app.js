@@ -4,7 +4,7 @@
   const $ = (s, root = document) => root.querySelector(s);
   const $$ = (s, root = document) => [...root.querySelectorAll(s)];
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const state = { project: null, selected: null, tab: 'ladder', zoom: 1, showRaw: false, rendered: [] };
+  const state = { project: null, selected: null, tab: 'ladder', zoom: 1, showRaw: false, rendered: [], tagValues: {} };
   const outputOps = new Set(['OTE','OTL','OTU','RES','MOV','COP','CPS','JSR','JMP','RET','SFR','FOR','BRK','FFL','FFU','BSL','BSR','SQL','SQO','FBC']);
   const contactOps = new Set(['XIC','XIO','ONS','OSR','OSF']);
   const compareOps = new Set(['EQU','NEQ','LES','LEQ','GRT','GEQ','LIM','MEQ','CMP']);
@@ -148,7 +148,7 @@
       const longest = Math.max(node?.op.length || 3, ...(node?.args || []).map(a => a.length));
       return block
         ? {w:Math.min(300,Math.max(178,longest*7+76)),h:Math.max(84,52+(node?.args.length||0)*20)}
-        : {w:Math.min(190,Math.max(116,longest*6+34)),h:72};
+        : {w:Math.min(320,Math.max(116,longest*7+44)),h:72};
     }
     if (node.type === 'sequence') {
       const ms = node.children.map(measure);
@@ -161,10 +161,10 @@
 
   function renderRung(rung, index, viewportWidth = 900) {
     const parser = new RLLParser(rung.text); const ast = parser.parse(); const m = measure(ast);
-    const W = Math.max(760,viewportWidth,Math.min(1500,m.w+180));
-    const H = Math.max(150, m.h + 92), y = 46;
-    const railL=22,railR=W-22,nodeL=66,nodeR=W-66,drawW=nodeR-nodeL;
-    const parts = [`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Rung ${esc(rung.number)} ladder diagram">`, svgDefs(), `<line class="rail" x1="${railL}" y1="8" x2="${railL}" y2="${H-8}"/><line class="rail" x1="${railR}" y1="8" x2="${railR}" y2="${H-8}"/>`];
+    const W = Math.max(1040,Math.min(1320,Math.max(viewportWidth,m.w+190)));
+    const H = Math.max(118, m.h + 54), y = 42;
+    const railL=72,railR=W-22,nodeL=104,nodeR=W-56,drawW=nodeR-nodeL;
+    const parts = [`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Rung ${esc(rung.number)} ladder diagram">`, svgDefs(), `<text class="rung-index" x="18" y="${y+4}">${esc(rung.number)}</text><line class="rail" x1="${railL}" y1="0" x2="${railL}" y2="${H}"/><line class="rail" x1="${railR}" y1="0" x2="${railR}" y2="${H}"/>`];
     parts.push(`<line class="wire" x1="${railL}" y1="${y}" x2="${nodeL}" y2="${y}"/>`);
     renderRoot(ast,nodeL,y,drawW,parts);
     parts.push(`<line class="wire" x1="${nodeR}" y1="${y}" x2="${railR}" y2="${y}"/>`, '</svg>');
@@ -172,7 +172,7 @@
     return { svg: parts.join(''), ast, warnings, rung, index, width:W };
   }
 
-  function svgDefs() { return `<style>.wire,.rail,.device{fill:none;stroke:#233a71;stroke-width:2;vector-effect:non-scaling-stroke}.wire.active{stroke:#18a957}.rail{stroke:#233a71;stroke-width:3}.junction{fill:#233a71}.label{font:12px 'Segoe UI',Arial,sans-serif;fill:#172033;text-anchor:middle}.op{font:700 9px 'Segoe UI',Arial,sans-serif;fill:#61708a;text-anchor:middle}.mnemonic{fill:#172033}.arg-label{font:8px 'Segoe UI',Arial,sans-serif;fill:#53627a}.arg-value{font:9px 'SFMono-Regular',Consolas,monospace;fill:#172033;text-anchor:end}.block{fill:#fff;stroke:#233a71;stroke-width:1.4}.divider{stroke:#9ca9bd;stroke-width:1}.unknown{fill:#fff8e8;stroke:#9a6b18}</style>`; }
+  function svgDefs() { return `<style>.wire,.rail,.device{fill:none;stroke:#243b7a;stroke-width:1.45;vector-effect:non-scaling-stroke}.wire.active,.device.active{stroke:#15b84e;stroke-width:4}.rail{stroke:#243b7a;stroke-width:1.7}.junction{fill:#243b7a}.rung-index{font:14px Georgia,'Times New Roman',serif;fill:#243b7a}.label{font:13px Arial,'Segoe UI',sans-serif;fill:#111;text-anchor:middle}.op{font:700 10px Arial,'Segoe UI',sans-serif;fill:#243b7a;text-anchor:middle}.mnemonic{fill:#243b7a}.arg-label{font:11px Arial,'Segoe UI',sans-serif;fill:#243b7a}.arg-value{font:12px Arial,'Segoe UI',sans-serif;fill:#111;text-anchor:end}.block{fill:#fff;stroke:#243b7a;stroke-width:1.25}.divider{stroke:#243b7a;stroke-width:1}.unknown{fill:#fff8e8;stroke:#9a6b18}</style>`; }
   function isActionNode(node){
     if(node.type==='instruction')return outputOps.has(node.op)||timerOps.has(node.op)||['ADD','SUB','MUL','DIV','ABS','CPT','CLR','SWPB','OR','PID','MSG'].includes(node.op);
     if(node.type==='sequence')return node.children.length>0&&isActionNode(node.children.at(-1));
@@ -215,16 +215,16 @@
     }
   }
   function renderInstruction(n, x, cy, width, out) {
-    const cx=x+width/2, label=short(n.args[0] || '', 31), wireL=x+8, wireR=x+width-8;
-    out.push(`<line class="wire" x1="${x}" y1="${cy}" x2="${wireL}" y2="${cy}"/><line class="wire" x1="${wireR}" y1="${cy}" x2="${x+width}" y2="${cy}"/>`);
+    const cx=x+width/2, label=short(n.args[0] || '', 52), wireL=x+8, wireR=x+width-8, active=instructionActive(n), live=active?' active':'';
+    out.push(`<line class="wire${live}" x1="${x}" y1="${cy}" x2="${wireL}" y2="${cy}"/><line class="wire${live}" x1="${wireR}" y1="${cy}" x2="${x+width}" y2="${cy}"/>`);
     if (n.op==='XIC'||n.op==='XIO') {
-      out.push(`<title>${esc(n.raw)}</title><text class="label" x="${cx}" y="${cy-21}">${esc(label)}</text><line class="device" x1="${cx-10}" y1="${cy-14}" x2="${cx-10}" y2="${cy+14}"/><line class="device" x1="${cx+10}" y1="${cy-14}" x2="${cx+10}" y2="${cy+14}"/>`);
-      if(n.op==='XIO') out.push(`<line class="device" x1="${cx-15}" y1="${cy+16}" x2="${cx+15}" y2="${cy-16}"/>`);
-      out.push(`<line class="wire" x1="${wireL}" y1="${cy}" x2="${cx-10}" y2="${cy}"/><line class="wire" x1="${cx+10}" y1="${cy}" x2="${wireR}" y2="${cy}"/><text class="op" x="${cx}" y="${cy+29}">${n.op}</text>`); return;
+      out.push(`<title>${esc(n.raw)}</title><text class="label" x="${cx}" y="${cy-17}">${esc(label)}</text><line class="device${live}" x1="${cx-10}" y1="${cy-12}" x2="${cx-10}" y2="${cy+12}"/><line class="device${live}" x1="${cx+10}" y1="${cy-12}" x2="${cx+10}" y2="${cy+12}"/>`);
+      if(n.op==='XIO') out.push(`<line class="device${live}" x1="${cx-14}" y1="${cy+14}" x2="${cx+14}" y2="${cy-14}"/>`);
+      out.push(`<line class="wire${live}" x1="${wireL}" y1="${cy}" x2="${cx-10}" y2="${cy}"/><line class="wire${live}" x1="${cx+10}" y1="${cy}" x2="${wireR}" y2="${cy}"/>`); return;
     }
     if (['OTE','OTL','OTU'].includes(n.op)) {
       const mark=n.op==='OTE'?'':n.op==='OTL'?'L':'U';
-      out.push(`<title>${esc(n.raw)}</title><text class="label" x="${cx}" y="${cy-21}">${esc(label)}</text><path class="device" d="M ${cx-18} ${cy-17} Q ${cx-30} ${cy} ${cx-18} ${cy+17} M ${cx+18} ${cy-17} Q ${cx+30} ${cy} ${cx+18} ${cy+17}"/><line class="wire" x1="${wireL}" y1="${cy}" x2="${cx-24}" y2="${cy}"/><line class="wire" x1="${cx+24}" y1="${cy}" x2="${wireR}" y2="${cy}"/><text class="label" x="${cx}" y="${cy+4}">${mark}</text><text class="op" x="${cx}" y="${cy+31}">${n.op}</text>`); return;
+      out.push(`<title>${esc(n.raw)}</title><text class="label" x="${cx}" y="${cy-17}">${esc(label)}</text><path class="device${live}" d="M ${cx-15} ${cy-15} Q ${cx-25} ${cy} ${cx-15} ${cy+15} M ${cx+15} ${cy-15} Q ${cx+25} ${cy} ${cx+15} ${cy+15}"/><line class="wire${live}" x1="${wireL}" y1="${cy}" x2="${cx-21}" y2="${cy}"/><line class="wire${live}" x1="${cx+21}" y1="${cy}" x2="${wireR}" y2="${cy}"/><text class="label" x="${cx}" y="${cy+4}">${mark}</text>`); return;
     }
     if (['ONS','OSR','OSF'].includes(n.op)) {
       out.push(`<text class="label" x="${cx}" y="${cy-24}">${esc(label)}</text><rect class="block" x="${cx-23}" y="${cy-15}" width="46" height="30"/><text class="op" x="${cx}" y="${cy+3}">${n.op}</text><line class="wire" x1="${wireL}" y1="${cy}" x2="${cx-23}" y2="${cy}"/><line class="wire" x1="${cx+23}" y1="${cy}" x2="${wireR}" y2="${cy}"/>`); return;
@@ -234,6 +234,10 @@
     out.push(`<title>${esc(instructionNames[n.op]||n.op)} · ${esc(n.raw)}</title><rect class="block ${known?'':'unknown'}" x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="1"/><text class="op mnemonic" x="${cx}" y="${by+13}">${esc(n.op)}</text><line class="divider" x1="${bx}" y1="${by+19}" x2="${bx+bw}" y2="${by+19}"/>`);
     n.args.slice(0,6).forEach((a,i)=>{const label=(operandNames[n.op]||[])[i]||(i?`Operand ${i+1}`:'Operand');const yy=by+35+i*21;out.push(`<text class="arg-label" x="${bx+7}" y="${yy}">${esc(label)}</text><text class="arg-value" x="${bx+bw-7}" y="${yy}">${esc(short(a,Math.max(8,Math.floor((bw-62)/5.5))))}</text>`)});
     out.push(`<line class="wire" x1="${wireL}" y1="${cy}" x2="${bx}" y2="${cy}"/><line class="wire" x1="${bx+bw}" y1="${cy}" x2="${wireR}" y2="${cy}"/>`);
+  }
+  function instructionActive(n){
+    const key=n.args[0]; if(!key||!Object.prototype.hasOwnProperty.call(state.tagValues,key))return false;
+    const value=!!state.tagValues[key]; return n.op==='XIO'?!value:value;
   }
   function short(s,n){return s.length>n?s.slice(0,n-1)+'…':s;}
 
@@ -286,8 +290,12 @@
   function renderRoutine(){
     const r=state.selected, canvas=$('#ladderCanvas'); state.rendered=[];
     if(r.type!=='RLL'){canvas.innerHTML=`<div class="report-card"><h3>${esc(r.type)} 원본 보존</h3><p>이 형식은 래더로 변환하지 않습니다. 원본 로직 탭에서 그대로 확인할 수 있습니다.</p></div>`;$('#conversionBadge').textContent='원본 보존';renderReport();return;}
-    const sheet=document.createElement('div');sheet.className='ladder-sheet';const viewportWidth=Math.max(680,(canvas.clientWidth-38)/state.zoom);
-    r.rungs.forEach((rung,i)=>{const rr=renderRung(rung,i,viewportWidth);state.rendered.push(rr);const card=document.createElement('article');card.className='rung-card';card.innerHTML=`<header class="rung-head"><span class="rung-number">RUNG ${esc(rung.number)}</span><span class="rung-comment">${esc(rung.comment||'')}</span>${rr.warnings.length?`<span class="rung-warning">△ ${rr.warnings.length}</span>`:''}</header><div class="rung-svg-wrap">${rr.svg}</div><div class="rung-source" ${state.showRaw?'':'hidden'}>${esc(rung.text)}</div>`;sheet.appendChild(card);});
+    const sheet=document.createElement('div');sheet.className='ladder-sheet logix-page';const viewportWidth=Math.max(1040,(canvas.clientWidth-38)/state.zoom);
+    const now=new Date().toLocaleString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+    sheet.innerHTML=`<header class="logix-print-head"><div><strong>${esc(r.name)} - Ladder Diagram</strong><span>${esc(state.project.name)}:${esc(r.program)}:${esc(r.name)}</span><span>Total number of rungs in routine: ${r.rungs.length}</span></div><div><b>Page 1</b><span>${esc(now)}</span><span>${esc(state.project.filename)}</span></div></header><div class="logix-rule"></div><section class="logix-rungs"></section>`;
+    const rungRoot=$('.logix-rungs',sheet);
+    r.rungs.forEach((rung,i)=>{const rr=renderRung(rung,i,viewportWidth);state.rendered.push(rr);const card=document.createElement('article');card.className='logix-rung';const visibleComment=rung.comment&&rung.comment!=='붙여넣은 RLL 텍스트';card.innerHTML=`${visibleComment?`<div class="logix-comment">${esc(rung.comment)}</div>`:''}<div class="rung-svg-wrap">${rr.svg}</div>${rr.warnings.length?`<span class="rung-warning logix-warning">△ ${rr.warnings.length}</span>`:''}<div class="rung-source" ${state.showRaw?'':'hidden'}>${esc(rung.text)}</div>`;rungRoot.appendChild(card);});
+    const footer=document.createElement('footer');footer.className='logix-print-foot';footer.innerHTML='<span>(End)</span><b>Logix Designer</b>';sheet.appendChild(footer);
     const sheetWidth=Math.max(viewportWidth,...state.rendered.map(x=>x.width));sheet.style.width=`${sheetWidth}px`;sheet.style.minWidth=`${sheetWidth}px`;
     if(!r.rungs.length)sheet.innerHTML='<div class="report-card"><h3>변환 가능한 명령이 없습니다.</h3><p>원본 로직 탭에서 내용을 확인하세요.</p></div>';canvas.innerHTML='';canvas.appendChild(sheet);applyZoom();
     $('#conversionBadge').textContent=r.origin==='text'?'RLL 텍스트 파싱':'원본 RLL 파싱';renderReport();
@@ -335,11 +343,13 @@
   window.L5XLadder={
     RLLParser,parseProject,measure,renderRung,vw,
     loadTextLogic,loadFile,selectRoutine,renderRoutine,
+    setTagValues(values){state.tagValues={...(values||{})};if(state.selected)renderRoutine();},
     diagnostics:auditProject,getState:()=>state
   };
 
   // Optional auto-preload: window.LD_PRELOAD or window.SC1_LD_PRELOAD = { name, source }
   function tryPreload(){
+    if(window.LD_TAG_VALUES)state.tagValues={...window.LD_TAG_VALUES};
     const p = window.LD_PRELOAD || window.SC1_LD_PRELOAD;
     if(!p || !p.source) return;
     try { loadTextLogic(p.name || 'Text_Logic', p.source); }
