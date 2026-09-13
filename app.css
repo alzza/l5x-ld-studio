@@ -5,3 +5,10 @@
 @media(max-width:620px){.topbar{padding:0 12px}.brand small{display:none}.workspace{display:block}.sidebar{max-height:270px;border-right:0;border-bottom:1px solid var(--line)}.import-card,.summary-grid{display:none!important}.routine-tree{max-height:160px}.welcome{min-height:calc(100vh - 338px)}.welcome h1{font-size:32px}.feature-row{flex-direction:column;gap:8px}.viewer-head{padding:12px 14px 0}.viewer-title-row{gap:10px}.export-actions{flex-wrap:wrap}.ladder-toolbar{padding:0 12px;gap:10px;flex-wrap:wrap;height:auto;min-height:48px}.conversion-badge{display:none}.ladder-canvas{padding:12px}.tabs{gap:15px}.hero-ladder{display:none}}
 @media print{.topbar,.sidebar,.viewer-head,.ladder-toolbar{display:none!important}.workspace{display:block}.main-panel,.viewer,.ladder-canvas{background:#fff!important;padding:0!important}.rung-card{break-inside:avoid;box-shadow:none}.rung-source{display:none}.ladder-sheet{transform:none!important}.toast{display:none}}
 .dialog-fields{grid-template-columns:1fr}
+
+/* Logix Designer-like print surface for the ladder renderer. */
+.ladder-canvas{background-color:#eef1f5;background-image:linear-gradient(#e3e7ee 1px,transparent 1px),linear-gradient(90deg,#e3e7ee 1px,transparent 1px);background-size:24px 24px}
+.rung-card{background:#fff;border:1px solid #bfc8d6;border-radius:1px;margin-bottom:18px;box-shadow:0 2px 5px rgba(30,42,60,.08)}
+.rung-head{height:32px;background:#f1f3f6;border-bottom-color:#c9d0dc;padding:0 12px}
+.rung-svg-wrap{padding:8px 10px 7px;background:#fff}.rung-svg-wrap svg{display:block;max-width:none}
+@media print{.rung-card{border-color:#8e99aa;margin-bottom:12px;box-shadow:none}.rung-head{background:#fff}}

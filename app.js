@@ -140,26 +140,31 @@
     return new XMLSerializer().serializeToString(routine).replace(/></g, '>\n<');
   }
 
+  /* Logix Designer uses a fixed horizontal signal path.  Parallel paths keep
+     the first branch on that path and add the remaining branches underneath. */
   function measure(node) {
     if (!node || node.type === 'instruction') {
       const block = node && (timerOps.has(node.op) || compareOps.has(node.op) || (!contactOps.has(node.op) && !outputOps.has(node.op)));
       const longest = Math.max(node?.op.length || 3, ...(node?.args || []).map(a => a.length));
       return block
-        ? {w:Math.min(270,Math.max(174,longest*7+68)),h:Math.max(94,48+(node?.args.length||0)*20)}
-        : {w:Math.min(180,Math.max(110,longest*6+28)),h:70};
+        ? {w:Math.min(300,Math.max(178,longest*7+76)),h:Math.max(84,52+(node?.args.length||0)*20)}
+        : {w:Math.min(190,Math.max(116,longest*6+34)),h:72};
     }
     if (node.type === 'sequence') {
-      const ms = node.children.map(measure); return { w: Math.max(36, ms.reduce((n,m)=>n+m.w,0)), h: Math.max(70, ...ms.map(m=>m.h)) };
+      const ms = node.children.map(measure);
+      return { w: Math.max(48, ms.reduce((n,m)=>n+m.w,0) + Math.max(0,ms.length-1)*18), h: Math.max(72, ...ms.map(m=>m.h)) };
     }
-    const ms = node.branches.map(measure); return { w: Math.max(90, ...ms.map(m=>m.w)), h: ms.reduce((n,m)=>n+m.h,0) + Math.max(0, ms.length-1)*14 };
+    const ms = node.branches.map(measure);
+    return { w: Math.max(104, ...ms.map(m=>m.w)), h: Math.max(72, ms.reduce((n,m)=>n+m.h,0) + Math.max(0,ms.length-1)*28) };
   }
   function leafCount(node){if(node.type==='instruction')return 1;if(node.type==='sequence')return node.children.reduce((n,x)=>n+leafCount(x),0);return Math.max(0,...node.branches.map(leafCount));}
 
-  function renderRung(rung, index, viewportWidth = 680) {
+  function renderRung(rung, index, viewportWidth = 900) {
     const parser = new RLLParser(rung.text); const ast = parser.parse(); const m = measure(ast);
-    const W = Math.max(680,viewportWidth,leafCount(ast)>8?m.w+140:0), H = Math.max(105, m.h + 34), y = H / 2;
-    const railL=12,railR=W-12,nodeL=34,nodeR=W-34,drawW=nodeR-nodeL;
-    const parts = [`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Rung ${esc(rung.number)} ladder diagram">`, svgDefs(), `<line class="rail" x1="${railL}" y1="5" x2="${railL}" y2="${H-5}"/><line class="rail" x1="${railR}" y1="5" x2="${railR}" y2="${H-5}"/>`];
+    const W = Math.max(760,viewportWidth,Math.min(1500,m.w+180));
+    const H = Math.max(150, m.h + 92), y = 46;
+    const railL=22,railR=W-22,nodeL=66,nodeR=W-66,drawW=nodeR-nodeL;
+    const parts = [`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Rung ${esc(rung.number)} ladder diagram">`, svgDefs(), `<line class="rail" x1="${railL}" y1="8" x2="${railL}" y2="${H-8}"/><line class="rail" x1="${railR}" y1="8" x2="${railR}" y2="${H-8}"/>`];
     parts.push(`<line class="wire" x1="${railL}" y1="${y}" x2="${nodeL}" y2="${y}"/>`);
     renderRoot(ast,nodeL,y,drawW,parts);
     parts.push(`<line class="wire" x1="${nodeR}" y1="${y}" x2="${railR}" y2="${y}"/>`, '</svg>');
@@ -167,7 +172,7 @@
     return { svg: parts.join(''), ast, warnings, rung, index, width:W };
   }
 
-  function svgDefs() { return `<style>.wire,.rail,.device{fill:none;stroke:#172033;stroke-width:2;vector-effect:non-scaling-stroke}.rail{stroke-width:3}.junction{fill:#172033}.label{font:11px 'Segoe UI',Arial,sans-serif;fill:#172033;text-anchor:middle}.op{font:700 9px 'Segoe UI',Arial,sans-serif;fill:#697488;text-anchor:middle}.mnemonic{fill:#172033}.arg-label{font:8px 'Segoe UI',Arial,sans-serif;fill:#5d6673}.arg-value{font:9px 'SFMono-Regular',Consolas,monospace;fill:#202b3d;text-anchor:end}.block{fill:#f1f1ee;stroke:#172033;stroke-width:1.25}.divider{stroke:#9fa7b1;stroke-width:1}.unknown{fill:#f8f2e7;stroke:#9a6b18}</style>`; }
+  function svgDefs() { return `<style>.wire,.rail,.device{fill:none;stroke:#233a71;stroke-width:2;vector-effect:non-scaling-stroke}.wire.active{stroke:#18a957}.rail{stroke:#233a71;stroke-width:3}.junction{fill:#233a71}.label{font:12px 'Segoe UI',Arial,sans-serif;fill:#172033;text-anchor:middle}.op{font:700 9px 'Segoe UI',Arial,sans-serif;fill:#61708a;text-anchor:middle}.mnemonic{fill:#172033}.arg-label{font:8px 'Segoe UI',Arial,sans-serif;fill:#53627a}.arg-value{font:9px 'SFMono-Regular',Consolas,monospace;fill:#172033;text-anchor:end}.block{fill:#fff;stroke:#233a71;stroke-width:1.4}.divider{stroke:#9ca9bd;stroke-width:1}.unknown{fill:#fff8e8;stroke:#9a6b18}</style>`; }
   function isActionNode(node){
     if(node.type==='instruction')return outputOps.has(node.op)||timerOps.has(node.op)||['ADD','SUB','MUL','DIV','ABS','CPT','CLR','SWPB','OR','PID','MSG'].includes(node.op);
     if(node.type==='sequence')return node.children.length>0&&isActionNode(node.children.at(-1));
@@ -198,11 +203,14 @@
       node.children.forEach((child,i) => { const w = width * ms[i].w / natural; renderNode(child, xx, cy, w, out); xx += w; });
       if (!node.children.length) out.push(`<line class="wire" x1="${x}" y1="${cy}" x2="${x+width}" y2="${cy}"/>`); return;
     }
-    const ms = node.branches.map(measure), totalH = ms.reduce((n,m)=>n+m.h,0)+Math.max(0,ms.length-1)*14;
-    let yy = cy-totalH/2; const centers = [];
-    node.branches.forEach((b,i)=>{ centers.push(yy+ms[i].h/2); yy += ms[i].h+14; });
+    const ms = node.branches.map(measure), gap = 28;
+    /* Do not center branches around the main line.  The first branch is the
+       main rung and every additional path is routed downward like Logix. */
+    let yy = cy; const centers = [];
+    node.branches.forEach((b,i)=>{ centers.push(i===0 ? cy : yy + ms[i].h/2 - 36); yy += ms[i].h + gap; });
     if (centers.length) {
-      out.push(`<line class="wire" x1="${x}" y1="${centers[0]}" x2="${x}" y2="${centers.at(-1)}"/><line class="wire" x1="${x+width}" y1="${centers[0]}" x2="${x+width}" y2="${centers.at(-1)}"/>`);
+      const top = cy, bottom = centers.at(-1);
+      out.push(`<line class="wire" x1="${x}" y1="${top}" x2="${x}" y2="${bottom}"/><line class="wire" x1="${x+width}" y1="${top}" x2="${x+width}" y2="${bottom}"/>`);
       centers.forEach((bc,i)=>{ out.push(`<circle class="junction" cx="${x}" cy="${bc}" r="3"/><circle class="junction" cx="${x+width}" cy="${bc}" r="3"/>`); renderNode(node.branches[i],x,bc,width,out); });
     }
   }
