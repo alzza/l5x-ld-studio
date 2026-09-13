@@ -155,9 +155,10 @@
       return { w: Math.max(48, ms.reduce((n,m)=>n+m.w,0) + Math.max(0,ms.length-1)*18), h: Math.max(72, ...ms.map(m=>m.h)) };
     }
     const ms = node.branches.map(measure);
-    return { w: Math.max(104, ...ms.map(m=>m.w)), h: Math.max(72, ms.reduce((n,m)=>n+m.h,0) + Math.max(0,ms.length-1)*28) };
+    return { w: Math.max(104, ...ms.map(m=>m.w)), h: Math.max(72, ms.reduce((n,m)=>n+m.h,0) + Math.max(0,ms.length-1)*BRANCH_GAP) };
   }
   function leafCount(node){if(node.type==='instruction')return 1;if(node.type==='sequence')return node.children.reduce((n,x)=>n+leafCount(x),0);return Math.max(0,...node.branches.map(leafCount));}
+  const BRANCH_GAP = 88;
 
   function renderRung(rung, index, viewportWidth = 900) {
     const parser = new RLLParser(rung.text); const ast = parser.parse(); const m = measure(ast);
@@ -205,7 +206,7 @@
       node.children.forEach((child,i) => { const w = width * ms[i].w / natural; renderNode(child, xx, cy, w, out); xx += w; });
       if (!node.children.length) out.push(`<line class="wire" x1="${x}" y1="${cy}" x2="${x+width}" y2="${cy}"/>`); return;
     }
-    const ms = node.branches.map(measure), gap = 28;
+    const ms = node.branches.map(measure), gap = BRANCH_GAP;
     /* Do not center branches around the main line.  The first branch is the
        main rung and every additional path is routed downward like Logix. */
     let yy = cy; const centers = [];
