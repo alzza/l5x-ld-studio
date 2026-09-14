@@ -336,23 +336,8 @@
     }));
     return {routines:state.project.all.length,rllRoutines:state.project.all.filter(r=>r.type==='RLL').length,stRoutines:state.project.all.filter(r=>r.type==='ST').length,sfcRoutines:state.project.all.filter(r=>r.type==='SFC').length,rungs:parsed,warningRungs,warnings,instructionTypes:ops.size,unknownInstructionTypes:unknownOps.size,maxBranchDepth};
   }
-  let toastTimer;function toast(msg,error=false){const t=$('#toast');t.textContent=msg;t.style.background=error?'#9c2020':'';t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),3000);}
+  let toastTimer;function toast(msg,error=false){const t=$('#toast');if(!t)return;t.textContent=msg;t.style.background=error?'#9c2020':'';t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),3000);}
 
-  $('#fileInput').addEventListener('change',e=>e.target.files[0]&&loadFile(e.target.files[0]));
-  $('#searchInput').addEventListener('input',e=>renderTree(e.target.value));
-  $$('.tab').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
-  $('#zoomRange').addEventListener('input',e=>{state.zoom=+e.target.value/100;renderRoutine()});
-  const scaleEl=$('#scaleMode');
-  if(scaleEl){scaleEl.value=state.scaleMode;scaleEl.addEventListener('change',e=>{state.scaleMode=e.target.value==='fixed'?'fixed':'fit';try{localStorage.setItem(SCALE_KEY,state.scaleMode);}catch(err){}if(state.selected)renderRoutine();});}
-  $('#showRungMeta').addEventListener('change',e=>{state.showRungMeta=e.target.checked;renderRoutine()});
-  $('#showRaw').addEventListener('change',e=>{state.showRaw=e.target.checked;$$('.rung-source').forEach(x=>x.hidden=!state.showRaw)});
-  $('#exportSvg').onclick=exportSVG;$('#exportTxt').onclick=exportTXT;$('#printBtn').onclick=()=>window.print();
-  const textDialog=$('#textDialog');
-  $('#textImportBtn').onclick=()=>textDialog.showModal();
-  $('#textDialogClose').onclick=()=>textDialog.close();
-  $('#textConvertBtn').onclick=()=>{try{loadTextLogic($('#textRoutineName').value,$('#textLogicInput').value);textDialog.close();}catch(e){toast(e.message,true);}};
-  let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(state.selected&&!$('#viewer').hidden)renderRoutine();},180)});
-  const dz=$('#dropZone');['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag')}));['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('drag')}));dz.addEventListener('drop',e=>e.dataTransfer.files[0]&&loadFile(e.dataTransfer.files[0]));
   window.L5XLadder={
     RLLParser,parseProject,measure,renderRung,vw,
     loadTextLogic,loadFile,selectRoutine,renderRoutine,
@@ -360,14 +345,31 @@
     diagnostics:auditProject,getState:()=>state
   };
 
-  // Optional auto-preload: window.LD_PRELOAD or window.SC1_LD_PRELOAD = { name, source }
-  function tryPreload(){
-    if(window.LD_TAG_VALUES)state.tagValues={...window.LD_TAG_VALUES};
-    const p = window.LD_PRELOAD || window.SC1_LD_PRELOAD;
-    if(!p || !p.source) return;
-    try { loadTextLogic(p.name || 'Text_Logic', p.source); }
-    catch(e){ toast(e.message || String(e), true); }
+  if($('#fileInput')){
+    $('#fileInput').addEventListener('change',e=>e.target.files[0]&&loadFile(e.target.files[0]));
+    $('#searchInput').addEventListener('input',e=>renderTree(e.target.value));
+    $$('.tab').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
+    $('#zoomRange').addEventListener('input',e=>{state.zoom=+e.target.value/100;renderRoutine()});
+    const scaleEl=$('#scaleMode');
+    if(scaleEl){scaleEl.value=state.scaleMode;scaleEl.addEventListener('change',e=>{state.scaleMode=e.target.value==='fixed'?'fixed':'fit';try{localStorage.setItem(SCALE_KEY,state.scaleMode);}catch(err){}if(state.selected)renderRoutine();});}
+    const metaEl=$('#showRungMeta');
+    if(metaEl)metaEl.addEventListener('change',e=>{state.showRungMeta=e.target.checked;renderRoutine()});
+    $('#showRaw').addEventListener('change',e=>{state.showRaw=e.target.checked;$$('.rung-source').forEach(x=>x.hidden=!state.showRaw)});
+    $('#exportSvg').onclick=exportSVG;$('#exportTxt').onclick=exportTXT;$('#printBtn').onclick=()=>window.print();
+    const textDialog=$('#textDialog');
+    $('#textImportBtn').onclick=()=>textDialog.showModal();
+    $('#textDialogClose').onclick=()=>textDialog.close();
+    $('#textConvertBtn').onclick=()=>{try{loadTextLogic($('#textRoutineName').value,$('#textLogicInput').value);textDialog.close();}catch(e){toast(e.message,true);}};
+    let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(state.selected&&!$('#viewer').hidden)renderRoutine();},180)});
+    const dz=$('#dropZone');['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag')}));['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('drag')}));dz.addEventListener('drop',e=>e.dataTransfer.files[0]&&loadFile(e.dataTransfer.files[0]));
+    function tryPreload(){
+      if(window.LD_TAG_VALUES)state.tagValues={...window.LD_TAG_VALUES};
+      const p = window.LD_PRELOAD || window.SC1_LD_PRELOAD;
+      if(!p || !p.source) return;
+      try { loadTextLogic(p.name || 'Text_Logic', p.source); }
+      catch(e){ toast(e.message || String(e), true); }
+    }
+    if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', tryPreload);
+    else setTimeout(tryPreload, 0);
   }
-  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', tryPreload);
-  else setTimeout(tryPreload, 0);
 })();
