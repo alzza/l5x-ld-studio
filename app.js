@@ -5,6 +5,7 @@
   const $$ = (s, root = document) => [...root.querySelectorAll(s)];
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const SCALE_KEY = 'l5x-ld-scale-mode';
+  const NOTE_SHEET_MIN = 920;
   const state = { project: null, selected: null, tab: 'ladder', zoom: 1, showRaw: false, showRungMeta: true, scaleMode: (localStorage.getItem(SCALE_KEY)==='fit'?'fit':'fixed'), rendered: [], tagValues: {} };
   const outputOps = new Set(['OTE','OTL','OTU','RES','MOV','COP','CPS','JSR','JMP','RET','SFR','FOR','BRK','FFL','FFU','BSL','BSR','SQL','SQO','FBC']);
   const contactOps = new Set(['XIC','XIO','ONS','OSR','OSF']);
@@ -170,8 +171,7 @@
     const nodePadL = 32;
     const nodePadR = 34;
     const contentW = m.w + railL + pad + nodePadL + nodePadR;
-    const fill = viewportWidth > 0;
-    const W = Math.max(contentW, fill ? Math.max(1040, viewportWidth) : 0);
+    const W = Math.max(contentW, viewportWidth || 0);
     const H = Math.max(118, m.h + 54), y = 42;
     const railR = W - pad, nodeL = railL + nodePadL, nodeR = W - pad - nodePadR, drawW = nodeR - nodeL;
     const indexText = showIndex ? `<text class="rung-index" x="18" y="${y+4}">${esc(rung.number)}</text>` : '';
@@ -300,7 +300,7 @@
     const r=state.selected, canvas=$('#ladderCanvas'); state.rendered=[];
     if(r.type!=='RLL'){canvas.innerHTML=`<div class="report-card"><h3>${esc(r.type)} 원본 보존</h3><p>이 형식은 래더로 변환하지 않습니다. 원본 로직 탭에서 그대로 확인할 수 있습니다.</p></div>`;$('#conversionBadge').textContent='원본 보존';renderReport();return;}
     const sheet=document.createElement('div');sheet.className='ladder-sheet logix-page';sheet.dataset.scaleMode=state.scaleMode;
-    const viewportWidth=state.scaleMode==='fixed'?0:Math.max(1040,(canvas.clientWidth-38)/state.zoom);
+    const viewportWidth=state.scaleMode==='fixed'?NOTE_SHEET_MIN:Math.max(1040,(canvas.clientWidth-38)/state.zoom);
     const now=new Date().toLocaleString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
     sheet.innerHTML=`<header class="logix-print-head"><div><strong>${esc(r.name)} - Ladder Diagram</strong><span>${esc(state.project.name)}:${esc(r.program)}:${esc(r.name)}</span><span>Total number of rungs in routine: ${r.rungs.length}</span></div><div><b>Page 1</b><span>${esc(now)}</span><span>${esc(state.project.filename)}</span></div></header><div class="logix-rule"></div><section class="logix-rungs"></section>`;
     const rungRoot=$('.logix-rungs',sheet);
@@ -308,7 +308,7 @@
     const footer=document.createElement('footer');footer.className='logix-print-foot';footer.innerHTML='<span>(End)</span><b>Logix Designer</b>';sheet.appendChild(footer);
     const sheetWidth=Math.max(viewportWidth,...state.rendered.map(x=>x.width));sheet.style.width=`${sheetWidth}px`;sheet.style.minWidth=`${sheetWidth}px`;
     if(!r.rungs.length)sheet.innerHTML='<div class="report-card"><h3>변환 가능한 명령이 없습니다.</h3><p>원본 로직 탭에서 내용을 확인하세요.</p></div>';canvas.innerHTML='';canvas.appendChild(sheet);applyZoom();
-    $('#conversionBadge').textContent=state.scaleMode==='fixed'?'고정 배율 · 노트용':'시트 너비에 맞춤';renderReport();
+    $('#conversionBadge').textContent=state.scaleMode==='fixed'?'최소 가로 유지 · 노트용':'시트 너비에 맞춤';renderReport();
   }
   function renderReport(){
     const r=state.selected; const warnings=state.rendered.flatMap(x=>x.warnings.map(w=>`Rung ${x.rung.number}: ${w}`)); $('#warningCount').textContent=warnings.length||'';
