@@ -4,7 +4,7 @@
   const $ = (s, root = document) => root.querySelector(s);
   const $$ = (s, root = document) => [...root.querySelectorAll(s)];
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const state = { project: null, selected: null, tab: 'ladder', zoom: 1, showRaw: false, rendered: [], tagValues: {} };
+  const state = { project: null, selected: null, tab: 'ladder', zoom: 1, showRaw: false, showRungMeta: true, rendered: [], tagValues: {} };
   const outputOps = new Set(['OTE','OTL','OTU','RES','MOV','COP','CPS','JSR','JMP','RET','SFR','FOR','BRK','FFL','FFU','BSL','BSR','SQL','SQO','FBC']);
   const contactOps = new Set(['XIC','XIO','ONS','OSR','OSF']);
   const compareOps = new Set(['EQU','NEQ','LES','LEQ','GRT','GEQ','LIM','MEQ','CMP']);
@@ -160,14 +160,15 @@
   function leafCount(node){if(node.type==='instruction')return 1;if(node.type==='sequence')return node.children.reduce((n,x)=>n+leafCount(x),0);return Math.max(0,...node.branches.map(leafCount));}
   const BRANCH_GAP = 88;
 
-  function renderRung(rung, index, viewportWidth = 900) {
+  function renderRung(rung, index, viewportWidth = 900, showIndex = false) {
     const parser = new RLLParser(rung.text); const ast = parser.parse(); const m = measure(ast);
     // Never cap the natural width: a long tag must remain readable and its
     // connecting wire must have room on both sides of a function block.
     const W = Math.max(1040,viewportWidth,m.w+190);
     const H = Math.max(118, m.h + 54), y = 42;
     const railL=72,railR=W-22,nodeL=104,nodeR=W-56,drawW=nodeR-nodeL;
-    const parts = [`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Rung ${esc(rung.number)} ladder diagram">`, svgDefs(), `<text class="rung-index" x="18" y="${y+4}">${esc(rung.number)}</text><line class="rail" x1="${railL}" y1="0" x2="${railL}" y2="${H}"/><line class="rail" x1="${railR}" y1="0" x2="${railR}" y2="${H}"/>`];
+    const indexText = showIndex ? `<text class="rung-index" x="18" y="${y+4}">${esc(rung.number)}</text>` : '';
+    const parts = [`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Rung ${esc(rung.number)} ladder diagram">`, svgDefs(), `${indexText}<line class="rail" x1="${railL}" y1="0" x2="${railL}" y2="${H}"/><line class="rail" x1="${railR}" y1="0" x2="${railR}" y2="${H}"/>`];
     parts.push(`<line class="wire" x1="${railL}" y1="${y}" x2="${nodeL}" y2="${y}"/>`);
     renderRoot(ast,nodeL,y,drawW,parts);
     parts.push(`<line class="wire" x1="${nodeR}" y1="${y}" x2="${railR}" y2="${y}"/>`, '</svg>');
@@ -295,7 +296,7 @@
     const now=new Date().toLocaleString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
     sheet.innerHTML=`<header class="logix-print-head"><div><strong>${esc(r.name)} - Ladder Diagram</strong><span>${esc(state.project.name)}:${esc(r.program)}:${esc(r.name)}</span><span>Total number of rungs in routine: ${r.rungs.length}</span></div><div><b>Page 1</b><span>${esc(now)}</span><span>${esc(state.project.filename)}</span></div></header><div class="logix-rule"></div><section class="logix-rungs"></section>`;
     const rungRoot=$('.logix-rungs',sheet);
-    r.rungs.forEach((rung,i)=>{const rr=renderRung(rung,i,viewportWidth);state.rendered.push(rr);const card=document.createElement('article');card.className='logix-rung';const visibleComment=rung.comment&&rung.comment!=='붙여넣은 RLL 텍스트';card.innerHTML=`${visibleComment?`<div class="logix-comment">${esc(rung.comment)}</div>`:''}<div class="rung-svg-wrap">${rr.svg}</div>${rr.warnings.length?`<span class="rung-warning logix-warning">△ ${rr.warnings.length}</span>`:''}<div class="rung-source" ${state.showRaw?'':'hidden'}>${esc(rung.text)}</div>`;rungRoot.appendChild(card);});
+    r.rungs.forEach((rung,i)=>{const rr=renderRung(rung,i,viewportWidth,false);state.rendered.push(rr);const card=document.createElement('article');card.className='logix-rung';const visibleComment=rung.comment&&rung.comment!=='붙여넣은 RLL 텍스트';const status=rr.warnings.length?`<span class="rung-status warn">검토 필요 · 경고 ${rr.warnings.length}</span>`:'<span class="rung-status ok">정상</span>';const meta=state.showRungMeta?`<div class="rung-meta"><span class="rung-meta-number">Rung ${esc(rung.number)}</span>${status}</div>`:'';card.innerHTML=`${meta}${visibleComment?`<div class="logix-comment">${esc(rung.comment)}</div>`:''}<div class="rung-svg-wrap">${rr.svg}</div>${rr.warnings.length?`<span class="rung-warning logix-warning">△ ${rr.warnings.length}</span>`:''}<div class="rung-source" ${state.showRaw?'':'hidden'}>${esc(rung.text)}</div>`;rungRoot.appendChild(card);});
     const footer=document.createElement('footer');footer.className='logix-print-foot';footer.innerHTML='<span>(End)</span><b>Logix Designer</b>';sheet.appendChild(footer);
     const sheetWidth=Math.max(viewportWidth,...state.rendered.map(x=>x.width));sheet.style.width=`${sheetWidth}px`;sheet.style.minWidth=`${sheetWidth}px`;
     if(!r.rungs.length)sheet.innerHTML='<div class="report-card"><h3>변환 가능한 명령이 없습니다.</h3><p>원본 로직 탭에서 내용을 확인하세요.</p></div>';canvas.innerHTML='';canvas.appendChild(sheet);applyZoom();
@@ -311,7 +312,7 @@
   function applyZoom(){const sheet=$('.ladder-sheet');if(!sheet)return;sheet.style.transform=`scale(${state.zoom})`;sheet.style.marginBottom=`${Math.max(0,(state.zoom-1)*sheet.offsetHeight)}px`;$('#zoomValue').textContent=`${Math.round(state.zoom*100)}%`;}
   function setTab(name){state.tab=name;$$('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));$('#ladderPanel').hidden=name!=='ladder';$('#sourcePanel').hidden=name!=='source';$('#reportPanel').hidden=name!=='report';}
   function download(name, content, type){const blob=new Blob([content],{type});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
-  function exportSVG(){if(!state.rendered.length)return toast('내보낼 래더가 없습니다.',true);const svgs=state.rendered.map(r=>new DOMParser().parseFromString(r.svg,'image/svg+xml').documentElement);const width=Math.max(...svgs.map(s=>+s.getAttribute('width'))),heights=svgs.map(s=>+s.getAttribute('height')+34),height=heights.reduce((a,b)=>a+b,0)+20;let y=20,body='';svgs.forEach((s,i)=>{body+=`<text x="18" y="${y+10}" font-family="Arial" font-size="10" fill="#5f6978">RUNG ${esc(state.rendered[i].rung.number)}</text><g transform="translate(0 ${y+15})">${s.innerHTML}</g>`;y+=heights[i]});download(`${safeName(state.selected.name)}.svg`,`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" fill="white"/>${body}</svg>`,'image/svg+xml');}
+  function exportSVG(){if(!state.rendered.length)return toast('내보낼 래더가 없습니다.',true);const svgs=state.rendered.map(r=>new DOMParser().parseFromString(r.svg,'image/svg+xml').documentElement);const width=Math.max(...svgs.map(s=>+s.getAttribute('width'))),heights=svgs.map(s=>+s.getAttribute('height')+20),height=heights.reduce((a,b)=>a+b,0)+20;let y=20,body='';svgs.forEach((s,i)=>{body+=`<g transform="translate(0 ${y})">${s.innerHTML}</g>`;y+=heights[i]});download(`${safeName(state.selected.name)}.svg`,`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" fill="white"/>${body}</svg>`,'image/svg+xml');}
   function exportTXT(){if(!state.rendered.length)return toast('내보낼 래더가 없습니다.',true);const lines=[];state.rendered.forEach(({rung,ast})=>{lines.push(`RUNG ${rung.number}${rung.comment?' · '+rung.comment:''}`,...astToText(ast), '');});download(`${safeName(state.selected.name)}.txt`,lines.join('\n'),'text/plain;charset=utf-8');}
   function astToText(ast){const paths=flattenPaths(ast).map(p=>p.map(formatTextInst));const inner=Math.max(70,...paths.flat().map(vw))+4;const top='┌'+'─'.repeat(inner)+'┐',bottom='└'+'─'.repeat(inner)+'┘',rows=[top];paths.forEach((p,i)=>{const s=` ${i?'├':'│'}─ ${p.join(' ── ')} ─`;rows.push('│'+s+' '.repeat(Math.max(0,inner-vw(s)))+'│')});rows.push(bottom);return rows;}
   function flattenPaths(n){if(n.type==='instruction')return [[n]];if(n.type==='parallel')return n.branches.flatMap(flattenPaths);let paths=[[]];for(const c of n.children){const cp=flattenPaths(c),next=[];for(const a of paths)for(const b of cp)next.push([...a,...b]);paths=next}return paths;}
@@ -333,6 +334,7 @@
   $('#searchInput').addEventListener('input',e=>renderTree(e.target.value));
   $$('.tab').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
   $('#zoomRange').addEventListener('input',e=>{state.zoom=+e.target.value/100;renderRoutine()});
+  $('#showRungMeta').addEventListener('change',e=>{state.showRungMeta=e.target.checked;renderRoutine()});
   $('#showRaw').addEventListener('change',e=>{state.showRaw=e.target.checked;$$('.rung-source').forEach(x=>x.hidden=!state.showRaw)});
   $('#exportSvg').onclick=exportSVG;$('#exportTxt').onclick=exportTXT;$('#printBtn').onclick=()=>window.print();
   const textDialog=$('#textDialog');

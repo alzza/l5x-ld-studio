@@ -91,8 +91,9 @@
           <div id="ladderPanel" class="tab-panel ladder-panel">
             <div class="ladder-toolbar">
               <label>확대 <input id="zoomRange" type="range" min="60" max="150" value="100"><output id="zoomValue">100%</output></label>
+              <label class="toggle"><input id="showRungMeta" type="checkbox" checked><span></span>라인 번호·상태</label>
               <label class="toggle"><input id="showRaw" type="checkbox"><span></span>명령어 표시</label>
-              <span id="conversionBadge" class="conversion-badge"></span>
+              <span id="conversionBadge" class="conversion-badge">웹 표시: 번호·상태 ON / 캡처·인쇄: 자동 숨김</span>
             </div>
             <div id="ladderCanvas" class="ladder-canvas"></div>
           </div>

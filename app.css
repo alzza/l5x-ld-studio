@@ -10,7 +10,7 @@
 .ladder-canvas{background-color:#eef1f5;background-image:linear-gradient(#e3e7ee 1px,transparent 1px),linear-gradient(90deg,#e3e7ee 1px,transparent 1px);background-size:24px 24px}
 .rung-card{background:#fff;border:1px solid #bfc8d6;border-radius:1px;margin-bottom:18px;box-shadow:0 2px 5px rgba(30,42,60,.08)}
 .rung-head{height:32px;background:#f1f3f6;border-bottom-color:#c9d0dc;padding:0 12px}
-.rung-svg-wrap{padding:8px 10px 7px;background:#fff}.rung-svg-wrap svg{display:block;max-width:none}
+.rung-svg-wrap{padding:8px 10px 7px;background:#fff;display:flex;justify-content:center}.rung-svg-wrap svg{display:block;max-width:none;margin:0 auto}
 @media print{.rung-card{border-color:#8e99aa;margin-bottom:12px;box-shadow:none}.rung-head{background:#fff}}
 
 /* Routine print view: proportions follow the Logix Designer ladder report. */
@@ -20,7 +20,9 @@
 .logix-print-head strong{font-size:21px}.logix-print-head b{font-size:18px}.logix-print-head span{font-size:14px;white-space:nowrap;max-width:70vw;overflow:hidden;text-overflow:ellipsis}
 .logix-rule{height:1px;background:#151515;margin:0 8px}.logix-rungs{padding-top:18px}.logix-rung{position:relative;background:#fff;margin:0;border:0;break-inside:avoid}.logix-rung+.logix-rung{border-top:0}
 .logix-rung .rung-svg-wrap{padding:0;background:#fff}.logix-rung .rung-source{margin:0 72px;border:1px solid #d7dce5;border-top:0}
+.rung-meta{height:28px;margin:0 72px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #d7dce5;color:#243b7a;font:12px Arial,"Segoe UI",sans-serif}.rung-meta-number{font-weight:700}.rung-status{font-size:11px;padding:2px 7px;border-radius:10px}.rung-status.ok{background:#e6f3ee;color:#177b55}.rung-status.warn{background:#fff0d8;color:#a86700}
 .logix-comment{position:absolute;z-index:1;left:86px;top:4px;color:#576681;font-size:10px;white-space:nowrap}.logix-warning{position:absolute;right:35px;top:7px;font-size:10px}
 .logix-print-foot{height:50px;margin:0 22px 0 72px;border-top:1px solid #111;display:flex;justify-content:space-between;align-items:flex-start;padding-top:4px;color:#243b7a;font:14px Georgia,"Times New Roman",serif}.logix-print-foot b{color:#111;font-weight:400}
 @media(max-width:850px){.logix-print-head span{max-width:55vw}.logix-page{box-shadow:none}}
 @media print{.logix-page{box-shadow:none;padding-bottom:0}.logix-print-head{height:64px}.logix-rungs{padding-top:8px}.logix-print-foot{page-break-after:always}}
+@media print{.rung-meta{display:none!important}}
