@@ -162,11 +162,17 @@
 
   function renderRung(rung, index, viewportWidth = 900, showIndex = false) {
     const parser = new RLLParser(rung.text); const ast = parser.parse(); const m = measure(ast);
-    // Never cap the natural width: a long tag must remain readable and its
-    // connecting wire must have room on both sides of a function block.
-    const W = Math.max(1040,viewportWidth,m.w+190);
+    // Number column used to reserve 72px on the left.  Captured SVGs keep the
+    // smaller right pad on both sides so the ladder can scale up on notes.
+    const pad = 22;
+    const railL = showIndex ? 72 : pad;
+    const nodePadL = 32;
+    const nodePadR = 34;
+    const contentW = m.w + railL + pad + nodePadL + nodePadR;
+    const fill = viewportWidth > 0;
+    const W = Math.max(contentW, fill ? Math.max(1040, viewportWidth) : 0);
     const H = Math.max(118, m.h + 54), y = 42;
-    const railL=72,railR=W-22,nodeL=104,nodeR=W-56,drawW=nodeR-nodeL;
+    const railR = W - pad, nodeL = railL + nodePadL, nodeR = W - pad - nodePadR, drawW = nodeR - nodeL;
     const indexText = showIndex ? `<text class="rung-index" x="18" y="${y+4}">${esc(rung.number)}</text>` : '';
     const parts = [`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Rung ${esc(rung.number)} ladder diagram">`, svgDefs(), `${indexText}<line class="rail" x1="${railL}" y1="0" x2="${railL}" y2="${H}"/><line class="rail" x1="${railR}" y1="0" x2="${railR}" y2="${H}"/>`];
     parts.push(`<line class="wire" x1="${railL}" y1="${y}" x2="${nodeL}" y2="${y}"/>`);
