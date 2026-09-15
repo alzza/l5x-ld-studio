@@ -477,11 +477,29 @@
         const hit = rects.some(o => o.id !== box.node.id && overlap(r, o, 2));
         return { hit, side, lx, ly, name, condLines, r };
       }
-      let placed = attempt('right', 210, -2);
-      if (placed.hit) placed = attempt('left', 210, -2);
-      if (placed.hit) placed = attempt('right', 140, 22);
-      if (placed.hit) placed = attempt('left', 140, 22);
-      if (placed.hit) placed = attempt('right', 120, 26);
+      let placed = null;
+      const sides = ['right', 'left'];
+      const widths = [220, 170, 130, 96];
+      const yOffs = [-2, 18, 28];
+      outer: for (let yi = 0; yi < yOffs.length; yi++) {
+        for (let si = 0; si < sides.length; si++) {
+          for (let wi = 0; wi < widths.length; wi++) {
+            const p = attempt(sides[si], widths[wi], yOffs[yi]);
+            if (!p.hit) { placed = p; break outer; }
+            placed = p;
+          }
+        }
+      }
+      if (!placed || placed.hit) {
+        const condLines = wrapToWidth(rawCond, 160, 6.6);
+        const textW = Math.max(name.length * 6.2, ...condLines.map(l => l.length * 6.6), 36);
+        const lx = cx + 22;
+        const blockers = rects.filter(o => o.id !== box.node.id && o.x < lx + textW && o.x + o.w > lx);
+        const topBlock = blockers.filter(o => o.y >= y).sort((a, b) => a.y - b.y)[0];
+        const ly = topBlock ? Math.max(y - 4 - (12 + (name ? 12 : 0) + condLines.length * 13), y - 48) : y + 22;
+        const r = { x: lx, y: ly, w: textW + 6, h: 16 + condLines.length * 13, id: box.node.id };
+        placed = { hit: false, side: 'right', lx, ly, name, condLines, r };
+      }
       box.label = placed;
     });
 
