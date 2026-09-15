@@ -1,10 +1,12 @@
 # L5X Ladder Studio
 
-Studio 5000 `.L5X` 파일을 브라우저에서 읽어 RLL 루틴을 래더 다이어그램(LD)으로 재구성하는 오프라인 웹 도구입니다.
+Studio 5000 `.L5X` 파일을 브라우저에서 읽어 RLL 루틴은 래더 다이어그램(LD)으로, SFC 루틴은 Sequential Function Chart로 재구성하는 오프라인 웹 도구입니다.
 
 **Live:** https://alzza.github.io/l5x-ld-studio/
 
 샘플 래더: https://alzza.github.io/l5x-ld-studio/demo.html
+
+샘플 SFC: https://alzza.github.io/l5x-ld-studio/demo-sfc.html
 
 파일은 서버로 전송되지 않습니다. 파싱·렌더는 전부 브라우저 안에서 끝납니다.
 
@@ -34,18 +36,19 @@ XIC(Start_PB)XIO(Stop_PB)OTE(Motor_Run);
 - 블록 좌우 연결선이 명령 상자에서 잘리지 않도록 자연 폭 계산
 - `L5XLadder.setTagValues({...})`로 XIC/XIO/코일 활성 상태를 녹색으로 표시
 - 화면·SVG·인쇄/PDF가 같은 래더 좌표를 사용
+- SFC 루틴을 L5X 좌표 그대로 Sequential Function Chart로 표시
 
 ## 지원
 
 - RLL: 직렬 명령, 중첩 병렬 분기, XIC/XIO, OTE/OTL/OTU, ONS/OSR/OSF, 타이머·카운터·비교·이동·호출 계열
-- ST / SFC: LD로 변환하지 않고 원문·원본 XML을 그대로 표시
+- SFC: L5X 좌표로 Sequential Function Chart를 그림. ST는 원문 보존
 - 내보내기: SVG, TXT, 브라우저 인쇄/PDF
 - 레이아웃: Rockwell 매뉴얼 기준의 수평 주선·하향 Branch·연속 전원 레일
 - 태그 표시: 원문 전체를 보존하며 임의 생략하지 않음
 
 ## 정확도
 
-래더 변환 대상은 RLL 루틴과 직접 입력한 RLL Neutral Text뿐입니다. ST와 SFC는 의미나 실행 순서를 바꾸지 않도록 LD로 바꾸지 않습니다.
+래더 변환 대상은 RLL 루틴과 직접 입력한 RLL Neutral Text입니다. SFC는 LD로 바꾸지 않고 매뉴얼 기호로 차트를 그립니다. ST는 원문을 보존합니다.
 
 ## 로컬 파일
 
@@ -53,8 +56,10 @@ XIC(Start_PB)XIO(Stop_PB)OTE(Motor_Run);
 |------|------|
 | `index.html` | 스튜디오 |
 | `demo.html` | 범용 모터 스타터 샘플 자동 로드 |
-| `app.js` / `app.css` | 파서·렌더러 |
+| `app.js` / `app.css` | 스튜디오 셸·RLL 렌더러 |
+| `sfc.js` | SFC 파서·차트 렌더러 |
 | `sample.rll` | 샘플 Neutral Text |
+| `sample-sfc.xml` | 샘플 SFC (공장 파일 아님) |
 
 Plant / 고객 프로젝트 L5X는 이 저장소에 포함하지 않습니다.
 

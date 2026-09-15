@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RSLogix5000Content SchemaRevision="1.0" SoftwareRevision="32.00">
+  <Controller Name="SFC_Demo" ProcessorType="Emulator">
+    <Programs>
+      <Program Name="MainProgram">
+        <Routines>
+          <Routine Name="Machine_SFC" Type="SFC">
+            <SFCContent SheetSize="Letter" SheetOrientation="Portrait">
+              <Step ID="1" X="280" Y="16" Operand="initialize" InitialStep="true" ShowActions="true">
+                <Action ID="11" Operand="devices_in_program_mode" Qualifier="N">
+                  <Body>
+                    <STContent>
+                      <Line Number="0">conveyor_program_control := 1;</Line>
+                      <Line Number="1">fan_program_control := 1;</Line>
+                    </STContent>
+                  </Body>
+                </Action>
+                <Action ID="12" Operand="fan_on" Qualifier="S">
+                  <Body>
+                    <STContent>
+                      <Line Number="0">fan_state := 1;</Line>
+                    </STContent>
+                  </Body>
+                </Action>
+              </Step>
+              <Transition ID="2" X="321" Y="150" Operand="initialize_done">
+                <Condition>
+                  <STContent>
+                    <Line Number="0">initialize.DN AND fan.Device1State</Line>
+                  </STContent>
+                </Condition>
+              </Transition>
+              <Step ID="3" X="280" Y="230" Operand="conveyor_fwd" ShowActions="true">
+                <Action ID="31" Operand="conveyor_start" Qualifier="N">
+                  <Body>
+                    <STContent>
+                      <Line Number="0">conveyor_state := 1;</Line>
+                    </STContent>
+                  </Body>
+                </Action>
+                <Action ID="32" Operand="conveyor_stop" Qualifier="P0">
+                  <Body>
+                    <STContent>
+                      <Line Number="0">conveyor_state := 0;</Line>
+                    </STContent>
+                  </Body>
+                </Action>
+              </Step>
+              <Transition ID="4" X="321" Y="370" Operand="part_in_place">
+                <Condition>
+                  <STContent>
+                    <Line Number="0">part_sensor_photoeye</Line>
+                  </STContent>
+                </Condition>
+              </Transition>
+              <Branch ID="5" Y="430" BranchType="Simultaneous" BranchFlow="Diverge">
+                <Leg ID="51"/>
+                <Leg ID="52"/>
+                <Leg ID="53"/>
+                <Leg ID="54"/>
+              </Branch>
+              <Step ID="6" X="40" Y="460" Operand="press" ShowActions="false"/>
+              <Step ID="7" X="200" Y="460" Operand="stake" ShowActions="false"/>
+              <Step ID="8" X="360" Y="460" Operand="weld" ShowActions="true">
+                <Action ID="81" Operand="Action_004" Qualifier="N">
+                  <Body>
+                    <STContent>
+                      <Line Number="0">JSR(Weld,0);</Line>
+                    </STContent>
+                  </Body>
+                </Action>
+              </Step>
+              <Step ID="9" X="720" Y="460" Operand="palletize" ShowActions="false"/>
+              <Branch ID="10" Y="560" BranchType="Simultaneous" BranchFlow="Converge">
+                <Leg ID="101"/>
+                <Leg ID="102"/>
+                <Leg ID="103"/>
+                <Leg ID="104"/>
+              </Branch>
+              <Transition ID="13" X="321" Y="590" Operand="all_stations_done">
+                <Condition>
+                  <STContent>
+                    <Line Number="0">JSR(Assembly_done,0);</Line>
+                  </STContent>
+                </Condition>
+              </Transition>
+              <Stop ID="14" X="301" Y="680" Operand="Halt"/>
+              <TextBox ID="20" X="16" Y="90" Width="200">
+                <Text>Sample SFC. Not a plant export.</Text>
+              </TextBox>
+              <SbrRet ID="21" X="16" Y="16" In="Start" Ret="Done"/>
+              <DirectedLink FromID="1" ToID="2" Show="true"/>
+              <DirectedLink FromID="2" ToID="3" Show="true"/>
+              <DirectedLink FromID="3" ToID="4" Show="true"/>
+              <DirectedLink FromID="4" ToID="5" Show="true"/>
+              <DirectedLink FromID="5" ToID="6" Show="true"/>
+              <DirectedLink FromID="5" ToID="7" Show="true"/>
+              <DirectedLink FromID="5" ToID="8" Show="true"/>
+              <DirectedLink FromID="5" ToID="9" Show="true"/>
+              <DirectedLink FromID="6" ToID="10" Show="true"/>
+              <DirectedLink FromID="7" ToID="10" Show="true"/>
+              <DirectedLink FromID="8" ToID="10" Show="true"/>
+              <DirectedLink FromID="9" ToID="10" Show="true"/>
+              <DirectedLink FromID="10" ToID="13" Show="true"/>
+              <DirectedLink FromID="13" ToID="14" Show="true"/>
+              <DirectedLink FromID="3" ToID="1" Show="false"/>
+              <Attachment FromID="20" ToID="1"/>
+            </SFCContent>
+          </Routine>
+        </Routines>
+      </Program>
+    </Programs>
+  </Controller>
+</RSLogix5000Content>

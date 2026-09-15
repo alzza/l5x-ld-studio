@@ -1,5 +1,13 @@
 # 변경 이력
 
+## 2026-09-16 — SFC 차트 뷰어
+
+- SFC 루틴은 원본 XML 덤프 대신 Sequential Function Chart로 그린다.
+- 위치는 L5X `X`/`Y`를 쓰고, `DirectedLink`로 연결한다.
+- Step, Action, Transition, Selection/Simultaneous 분기, Stop, TextBox, SbrRet를 그린다.
+- 액션 ST 본문은 스텝의 `ShowActions`를 따른다.
+- 편집기는 넣지 않는다. 기준은 1756-PM006L이다.
+
 ## 2026-09-14 — 노트 실시간 렌더
 
 - UI가 없는 페이지에서도 `L5XLadder.renderRung`만 불러 쓸 수 있다.

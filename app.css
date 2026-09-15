@@ -25,4 +25,7 @@
 .logix-print-foot{height:50px;margin:0 22px 0 72px;border-top:1px solid #111;display:flex;justify-content:space-between;align-items:flex-start;padding-top:4px;color:#243b7a;font:14px Georgia,"Times New Roman",serif}.logix-print-foot b{color:#111;font-weight:400}
 @media(max-width:850px){.logix-print-head span{max-width:55vw}.logix-page{box-shadow:none}}
 @media print{.logix-page{box-shadow:none;padding-bottom:0}.logix-print-head{height:64px}.logix-rungs{padding-top:8px}.logix-print-foot{page-break-after:always}}
+.sfc-page{background:#fff}
+.sfc-svg-wrap{background:#fff;padding:8px 12px 16px}
+.sfc-svg-wrap svg{display:block;background:#fff}
 @media print{.rung-meta{display:none!important}}

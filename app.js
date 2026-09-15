@@ -122,6 +122,9 @@
         } else if (type === 'ST') {
           const lines = $$(':scope > STContent > Line', routine).map(l => ({ number: l.getAttribute('Number'), text: l.textContent || '' }));
           item.source = lines.map(l => l.text).join('\n');
+        } else if (type === 'SFC') {
+          item.sfc = (globalThis.L5XSFC && typeof L5XSFC.parseSFC === 'function') ? L5XSFC.parseSFC(routine) : null;
+          item.source = serializeRoutineXML(routine);
         } else {
           item.source = serializeRoutineXML(routine);
         }
@@ -294,10 +297,41 @@
     });
     if(!root.children.length)root.innerHTML='<div class="empty-side">일치하는 루틴이 없습니다.</div>';
   }
-  function selectRoutine(r){state.selected=r;renderTree($('#searchInput').value);$('#breadcrumb').textContent=`${state.project.name} / Programs / ${r.program}`;$('#routineTitle').textContent=r.name;$('#typeBadge').textContent=r.type;$('#routineMeta').textContent=metaText(r);$('#sourceCode').textContent=r.source||'표시할 원본 로직이 없습니다.';renderRoutine();setTab(r.type==='RLL'?'ladder':'source');}
-  function metaText(r){if(r.type==='RLL')return `${r.rungs.length} Rungs · ${r.origin==='text'?'텍스트 RLL 변환':'원본 RLL'}`;if(r.type==='ST')return 'Structured Text 원문 보존';if(r.type==='SFC')return 'Sequential Function Chart 원본 구조 보존';return `${r.type} 루틴 · 원본 구조 보존`;}
+  function setChartToolbar(type){
+    const sfc=type==='SFC';
+    const scaleWrap=$('#scaleMode')&&$('#scaleMode').closest('label');
+    if(scaleWrap)scaleWrap.hidden=sfc;
+    const meta=$('#showRungMeta')&&$('#showRungMeta').closest('label');
+    if(meta)meta.hidden=sfc;
+    const raw=$('#showRaw')&&$('#showRaw').closest('label');
+    if(raw)raw.hidden=sfc;
+    const tab=document.querySelector('.tab[data-tab="ladder"]');
+    if(tab)tab.textContent=sfc?'SFC':'Ladder';
+  }
+  function selectRoutine(r){state.selected=r;renderTree($('#searchInput').value);$('#breadcrumb').textContent=`${state.project.name} / Programs / ${r.program}`;$('#routineTitle').textContent=r.name;$('#typeBadge').textContent=r.type;$('#routineMeta').textContent=metaText(r);$('#sourceCode').textContent=r.source||'표시할 원본 로직이 없습니다.';setChartToolbar(r.type);renderRoutine();setTab(r.type==='ST'?'source':'ladder');}
+  function metaText(r){if(r.type==='RLL')return `${r.rungs.length} Rungs · ${r.origin==='text'?'텍스트 RLL 변환':'원본 RLL'}`;if(r.type==='ST')return 'Structured Text 원문 보존';if(r.type==='SFC'){const c=r.sfc;return c?`SFC · 스텝 ${c.steps.length} · 트랜지션 ${c.transitions.length}`:'Sequential Function Chart';}return `${r.type} 루틴 · 원본 구조 보존`;}
+  function renderSfcSheet(r){
+    const canvas=$('#ladderCanvas');
+    if(!globalThis.L5XSFC||typeof L5XSFC.renderSFC!=='function'){
+      canvas.innerHTML='<div class="report-card"><h3>SFC 렌더러가 없습니다.</h3><p>sfc.js를 함께 로드해야 합니다.</p></div>';
+      $('#conversionBadge').textContent='SFC';renderReport();return;
+    }
+    const chart=r.sfc||L5XSFC.parseSFC(r.element);
+    r.sfc=chart;
+    const rr=L5XSFC.renderSFC(chart);
+    state.rendered=[{...rr,warnings:rr.warnings||[]}];
+    const now=new Date().toLocaleString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+    const sheet=document.createElement('div');
+    sheet.className='ladder-sheet logix-page sfc-page';
+    sheet.innerHTML=`<header class="logix-print-head"><div><strong>${esc(r.name)} - Sequential Function Chart</strong><span>${esc(state.project.name)}:${esc(r.program)}:${esc(r.name)}</span><span>Steps ${chart.steps.length} · Transitions ${chart.transitions.length}</span></div><div><b>Page 1</b><span>${esc(now)}</span><span>${esc(state.project.filename)}</span></div></header><div class="logix-rule"></div><div class="sfc-svg-wrap">${rr.svg}</div><footer class="logix-print-foot"><span>(End)</span><b>Logix Designer</b></footer>`;
+    sheet.style.width=`${Math.max(640,rr.width+32)}px`;
+    canvas.innerHTML='';canvas.appendChild(sheet);applyZoom();
+    $('#conversionBadge').textContent=rr.warnings.length?`SFC · 경고 ${rr.warnings.length}`:'SFC 차트';
+    renderReport();
+  }
   function renderRoutine(){
     const r=state.selected, canvas=$('#ladderCanvas'); state.rendered=[];
+    if(r.type==='SFC'){renderSfcSheet(r);return;}
     if(r.type!=='RLL'){canvas.innerHTML=`<div class="report-card"><h3>${esc(r.type)} 원본 보존</h3><p>이 형식은 래더로 변환하지 않습니다. 원본 로직 탭에서 그대로 확인할 수 있습니다.</p></div>`;$('#conversionBadge').textContent='원본 보존';renderReport();return;}
     const sheet=document.createElement('div');sheet.className='ladder-sheet logix-page';sheet.dataset.scaleMode=state.scaleMode;
     const viewportWidth=state.scaleMode==='fixed'?NOTE_SHEET_MIN:Math.max(1040,(canvas.clientWidth-38)/state.zoom);
@@ -311,7 +345,16 @@
     $('#conversionBadge').textContent=state.scaleMode==='fixed'?'최소 가로 유지 · 노트용':'시트 너비에 맞춤';renderReport();
   }
   function renderReport(){
-    const r=state.selected; const warnings=state.rendered.flatMap(x=>x.warnings.map(w=>`Rung ${x.rung.number}: ${w}`)); $('#warningCount').textContent=warnings.length||'';
+    const r=state.selected;
+    if(r.type==='SFC'){
+      const rr=state.rendered[0]||{}; const warnings=rr.warnings||(r.sfc&&r.sfc.warnings)||[];
+      const c=r.sfc||{};
+      $('#warningCount').textContent=warnings.length||'';
+      let html=`<div class="report-card"><h3>SFC 변환 상태</h3><p class="${warnings.length?'report-warn':'report-ok'}">${warnings.length?'일부 항목에 엔지니어 검토가 필요합니다.':'SFCContent를 차트로 그렸습니다.'}</p><ul><li>루틴 형식: SFC</li><li>스텝: ${c.steps?c.steps.length:0}</li><li>트랜지션: ${c.transitions?c.transitions.length:0}</li><li>분기: ${c.branches?c.branches.length:0}</li><li>링크: ${c.links?c.links.length:0}</li><li>파서 경고: ${warnings.length}</li></ul></div>`;
+      if(warnings.length)html+=`<div class="report-card"><h3>검토 목록</h3><ul>${warnings.map(w=>`<li>${esc(w)}</li>`).join('')}</ul></div>`;
+      $('#reportPanel').innerHTML=html;return;
+    }
+    const warnings=state.rendered.flatMap(x=>(x.warnings||[]).map(w=>x.rung?`Rung ${x.rung.number}: ${w}`:w)); $('#warningCount').textContent=warnings.length||'';
     const preserved=r.type!=='RLL';
     let html=`<div class="report-card"><h3>${preserved?'보존 상태':'변환 상태'}</h3><p class="${warnings.length?'report-warn':'report-ok'}">${preserved?'래더 변환 없이 원본 형식을 보존했습니다.':warnings.length?'일부 항목에 엔지니어 검토가 필요합니다.':'파서가 모든 RLL Rung을 정상적으로 해석했습니다.'}</p><ul><li>루틴 형식: ${esc(r.type)}</li><li>${preserved?'원본 보존':'표시 Rung'}: ${preserved?'예':r.rungs.length}</li><li>파서 경고: ${warnings.length}</li></ul></div>`;
     if(warnings.length)html+=`<div class="report-card"><h3>검토 목록</h3><ul>${warnings.map(w=>`<li>${esc(w)}</li>`).join('')}</ul></div>`;
@@ -320,8 +363,21 @@
   function applyZoom(){const sheet=$('.ladder-sheet');if(!sheet)return;sheet.style.transform=`scale(${state.zoom})`;sheet.style.marginBottom=`${Math.max(0,(state.zoom-1)*sheet.offsetHeight)}px`;$('#zoomValue').textContent=`${Math.round(state.zoom*100)}%`;}
   function setTab(name){state.tab=name;$$('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));$('#ladderPanel').hidden=name!=='ladder';$('#sourcePanel').hidden=name!=='source';$('#reportPanel').hidden=name!=='report';}
   function download(name, content, type){const blob=new Blob([content],{type});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
-  function exportSVG(){if(!state.rendered.length)return toast('내보낼 래더가 없습니다.',true);const svgs=state.rendered.map(r=>new DOMParser().parseFromString(r.svg,'image/svg+xml').documentElement);const width=Math.max(...svgs.map(s=>+s.getAttribute('width'))),heights=svgs.map(s=>+s.getAttribute('height')+20),height=heights.reduce((a,b)=>a+b,0)+20;let y=20,body='';svgs.forEach((s,i)=>{body+=`<g transform="translate(0 ${y})">${s.innerHTML}</g>`;y+=heights[i]});download(`${safeName(state.selected.name)}.svg`,`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" fill="white"/>${body}</svg>`,'image/svg+xml');}
-  function exportTXT(){if(!state.rendered.length)return toast('내보낼 래더가 없습니다.',true);const lines=[];state.rendered.forEach(({rung,ast})=>{lines.push(`RUNG ${rung.number}${rung.comment?' · '+rung.comment:''}`,...astToText(ast), '');});download(`${safeName(state.selected.name)}.txt`,lines.join('\n'),'text/plain;charset=utf-8');}
+  function exportSVG(){
+    if(!state.rendered.length)return toast('내보낼 차트가 없습니다.',true);
+    if(state.rendered[0].kind==='sfc'){
+      download(`${safeName(state.selected.name)}.svg`,state.rendered[0].svg,'image/svg+xml');return;
+    }
+    const svgs=state.rendered.map(r=>new DOMParser().parseFromString(r.svg,'image/svg+xml').documentElement);const width=Math.max(...svgs.map(s=>+s.getAttribute('width'))),heights=svgs.map(s=>+s.getAttribute('height')+20),height=heights.reduce((a,b)=>a+b,0)+20;let y=20,body='';svgs.forEach((s,i)=>{body+=`<g transform="translate(0 ${y})">${s.innerHTML}</g>`;y+=heights[i]});download(`${safeName(state.selected.name)}.svg`,`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" fill="white"/>${body}</svg>`,'image/svg+xml');
+  }
+  function exportTXT(){
+    if(!state.rendered.length)return toast('내보낼 차트가 없습니다.',true);
+    if(state.rendered[0].kind==='sfc'){
+      const text=(globalThis.L5XSFC&&L5XSFC.chartToText)?L5XSFC.chartToText(state.selected.sfc||{}):'';
+      download(`${safeName(state.selected.name)}.txt`,text||'SFC','text/plain;charset=utf-8');return;
+    }
+    const lines=[];state.rendered.forEach(({rung,ast})=>{lines.push(`RUNG ${rung.number}${rung.comment?' · '+rung.comment:''}`,...astToText(ast), '');});download(`${safeName(state.selected.name)}.txt`,lines.join('\n'),'text/plain;charset=utf-8');
+  }
   function astToText(ast){const paths=flattenPaths(ast).map(p=>p.map(formatTextInst));const inner=Math.max(70,...paths.flat().map(vw))+4;const top='┌'+'─'.repeat(inner)+'┐',bottom='└'+'─'.repeat(inner)+'┘',rows=[top];paths.forEach((p,i)=>{const s=` ${i?'├':'│'}─ ${p.join(' ── ')} ─`;rows.push('│'+s+' '.repeat(Math.max(0,inner-vw(s)))+'│')});rows.push(bottom);return rows;}
   function flattenPaths(n){if(n.type==='instruction')return [[n]];if(n.type==='parallel')return n.branches.flatMap(flattenPaths);let paths=[[]];for(const c of n.children){const cp=flattenPaths(c),next=[];for(const a of paths)for(const b of cp)next.push([...a,...b]);paths=next}return paths;}
   function formatTextInst(n){if(n.op==='XIC')return `──] [── ${n.args[0]}`;if(n.op==='XIO')return `──]/[── ${n.args[0]}`;if(n.op==='OTE')return `──( )── ${n.args[0]}`;if(n.op==='OTL')return `──(L)── ${n.args[0]}`;if(n.op==='OTU')return `──(U)── ${n.args[0]}`;return `[${n.op} ${n.args.join(', ')}]`;}
@@ -340,6 +396,10 @@
 
   window.L5XLadder={
     RLLParser,parseProject,measure,renderRung,vw,
+    parseSFC:(...a)=>globalThis.L5XSFC&&L5XSFC.parseSFC(...a),
+    parseSFCFromXml:(...a)=>globalThis.L5XSFC&&L5XSFC.parseSFCFromXml(...a),
+    renderSFC:(...a)=>globalThis.L5XSFC&&L5XSFC.renderSFC(...a),
+    chartToText:(...a)=>globalThis.L5XSFC&&L5XSFC.chartToText(...a),
     loadTextLogic,loadFile,selectRoutine,renderRoutine,
     setTagValues(values){state.tagValues={...(values||{})};if(state.selected)renderRoutine();},
     diagnostics:auditProject,getState:()=>state
@@ -364,6 +424,11 @@
     const dz=$('#dropZone');['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag')}));['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('drag')}));dz.addEventListener('drop',e=>e.dataTransfer.files[0]&&loadFile(e.dataTransfer.files[0]));
     function tryPreload(){
       if(window.LD_TAG_VALUES)state.tagValues={...window.LD_TAG_VALUES};
+      if(window.LD_PRELOAD_L5X){
+        try{state.project=parseProject(window.LD_PRELOAD_L5X,window.LD_PRELOAD_NAME||'preload.l5x');updateProjectUI();}
+        catch(e){toast(e.message||String(e),true);}
+        return;
+      }
       const p = window.LD_PRELOAD || window.SC1_LD_PRELOAD;
       if(!p || !p.source) return;
       try { loadTextLogic(p.name || 'Text_Logic', p.source); }

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>L5X Ladder Studio</title>
+  <title>L5X Ladder Studio — SFC Sample</title>
   <link rel="stylesheet" href="app.css">
 </head>
 <body>
@@ -11,70 +11,45 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
-        <div><strong>L5X Ladder Studio</strong><small>Studio 5000 Logic Designer</small></div>
+        <div><strong>L5X Ladder Studio</strong><small>Sample sequential function chart</small></div>
       </div>
       <div class="top-actions">
-        <span id="fileBadge" class="file-badge">파일을 열어 시작하세요</span>
-        <a class="button ghost" href="CHANGELOG.md">변경 이력</a>
+        <span id="fileBadge" class="file-badge">샘플 SFC 자동 로드</span>
         <button id="textImportBtn" class="button dark">RLL 텍스트 → LD</button>
         <label class="button primary" for="fileInput">L5X 열기</label>
         <input id="fileInput" type="file" accept=".l5x,.xml,text/xml" hidden>
+        <a class="button ghost" href="index.html">스튜디오</a>
       </div>
     </header>
-
     <div class="workspace">
       <aside class="sidebar">
         <section class="import-card" id="dropZone">
           <div class="upload-icon" aria-hidden="true">⇧</div>
           <strong>L5X 프로젝트 가져오기</strong>
-          <span>파일을 끌어 놓거나 위의 열기 버튼을 사용하세요.</span>
+          <span>샘플 대신 실제 프로젝트를 보려면 파일을 여세요.</span>
         </section>
-
         <div id="projectSummary" class="summary-grid" hidden>
           <div><b id="routineCount">0</b><span>루틴</span></div>
           <div><b id="rungCount">0</b><span>Rung</span></div>
           <div><b id="tagCount">0</b><span>태그</span></div>
         </div>
-
         <div class="search-wrap">
           <span aria-hidden="true">⌕</span>
           <input id="searchInput" type="search" placeholder="프로그램 또는 루틴 검색" aria-label="루틴 검색" disabled>
         </div>
         <nav id="routineTree" class="routine-tree" aria-label="프로젝트 루틴">
-          <div class="empty-side">L5X 내부의 Program과 Routine이 여기에 표시됩니다.</div>
+          <div class="empty-side">샘플 SFC가 자동으로 변환됩니다.</div>
         </nav>
       </aside>
-
       <main class="main-panel">
-        <div id="welcome" class="welcome">
-          <div class="hero-ladder" aria-hidden="true">
-            <span class="rail left"></span><span class="rail right"></span>
-            <div class="hero-rung one"><i></i><b>]</b><em>Start_PB</em><i></i><strong>( )</strong><em>Motor_Run</em></div>
-            <div class="hero-rung two"><i></i><b>]/[</b><em>Stop_PB</em><i></i><strong>(L)</strong><em>Run_Latch</em></div>
-          </div>
-          <p class="eyebrow">ROCKWELL AUTOMATION L5X</p>
-          <h1>로직을 읽는 순간,<br>래더가 됩니다.</h1>
-          <p>RLL은 래더 다이어그램으로, SFC는 Sequential Function Chart로 재구성합니다.<br>ST는 원문 그대로 보존합니다.</p>
-          <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
-            <label class="button primary large" for="fileInput">L5X 파일 선택</label>
-            <a class="button dark large" href="demo.html">샘플 래더</a>
-            <a class="button ghost large" href="demo-sfc.html">샘플 SFC</a>
-            <a class="button ghost large" href="CHANGELOG.md">변경 이력</a>
-          </div>
-          <div class="feature-row">
-            <span><b>RLL</b> 직렬·병렬 분기</span>
-            <span><b>SFC</b> 차트 뷰어</span>
-            <span><b>Export</b> SVG·TXT·PDF</span>
-          </div>
-        </div>
-
-        <section id="viewer" class="viewer" hidden>
+        <div id="welcome" class="welcome" hidden></div>
+        <section id="viewer" class="viewer">
           <div class="viewer-head">
-            <div class="breadcrumb" id="breadcrumb"></div>
+            <div class="breadcrumb" id="breadcrumb">Sample / Machine_SFC</div>
             <div class="viewer-title-row">
               <div>
-                <div class="title-line"><h1 id="routineTitle"></h1><span id="typeBadge" class="type-badge"></span></div>
-                <p id="routineMeta"></p>
+                <div class="title-line"><h1 id="routineTitle">Machine_SFC</h1><span id="typeBadge" class="type-badge">SFC</span></div>
+                <p id="routineMeta">샘플 Sequential Function Chart</p>
               </div>
               <div class="export-actions">
                 <button id="exportSvg" class="button ghost">SVG</button>
@@ -83,13 +58,12 @@
               </div>
             </div>
             <div class="tabs" role="tablist">
-              <button class="tab active" data-tab="ladder" role="tab">Ladder</button>
+              <button class="tab active" data-tab="ladder" role="tab">SFC</button>
               <button class="tab" data-tab="source" role="tab">원본 로직</button>
               <button class="tab" data-tab="report" role="tab">변환 리포트 <span id="warningCount"></span></button>
             </div>
           </div>
-
-          <div id="ladderPanel" class="tab-panel ladder-panel">
+          <div id="ladderPanel" class="tab-panel">
             <div class="ladder-toolbar">
               <label>확대 <input id="zoomRange" type="range" min="60" max="150" value="100"><output id="zoomValue">100%</output></label>
               <label>배율
@@ -100,7 +74,7 @@
               </label>
               <label class="toggle"><input id="showRungMeta" type="checkbox" checked><span></span>라인 번호·상태</label>
               <label class="toggle"><input id="showRaw" type="checkbox"><span></span>명령어 표시</label>
-              <span id="conversionBadge" class="conversion-badge">웹 표시: 번호·상태 ON / 캡처·인쇄: 자동 숨김</span>
+              <span id="conversionBadge" class="conversion-badge"></span>
             </div>
             <div id="ladderCanvas" class="ladder-canvas"></div>
           </div>
@@ -122,7 +96,7 @@
         </label>
       </div>
       <label class="logic-input-label">로직 원문
-        <textarea id="textLogicInput" spellcheck="false" placeholder="XIC(Start_PB)XIO(Stop_PB)OTE(Motor_Run);\nXIC(Motor_Run)[OTE(Output_A),OTE(Output_B)];"></textarea>
+        <textarea id="textLogicInput" spellcheck="false"></textarea>
       </label>
       <footer>
         <span>입력 내용은 브라우저 밖으로 전송되지 않습니다.</span>
@@ -132,6 +106,16 @@
   </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="sfc.js"></script>
-  <script src="app.js"></script>
+  <script>
+    window.LD_PRELOAD_NAME = 'sample-sfc.xml';
+    fetch('sample-sfc.xml').then(function (r) { return r.text(); }).then(function (xml) {
+      window.LD_PRELOAD_L5X = xml;
+      var s = document.createElement('script');
+      s.src = 'app.js';
+      document.body.appendChild(s);
+    }).catch(function (e) {
+      document.getElementById('ladderCanvas').innerHTML = '<div class="report-card"><h3>샘플 SFC를 읽지 못했습니다.</h3><p>' + String(e) + '</p></div>';
+    });
+  </script>
 </body>
 </html>
