@@ -310,70 +310,181 @@
 
   function sx(n) { return n * SCALE; }
 
-  function wrapLine(s, max) {
-    const text = String(s || '');
-    if (text.length <= max) return [text];
-    const out = [];
-    for (let i = 0; i < text.length; i += max) out.push(text.slice(i, i + max));
-    return out;
+  function wrapToWidth(text, maxW, charW) {
+    const s = String(text || '').replace(/\s+/g, ' ').trim();
+    if (!s) return [];
+    const cw = charW || 6.6;
+    const limit = Math.max(24, maxW);
+    if (s.length * cw <= limit) return [s];
+    const tokens = s.split(/(\s+|;|:=|\(|\)|,)/).filter(t => t !== '');
+    const lines = [];
+    let cur = '';
+    function fits(t) { return t.length * cw <= limit; }
+    tokens.forEach(tok => {
+      if (fits(cur + tok)) cur += tok;
+      else {
+        if (cur.trim()) lines.push(cur.replace(/\s+$/, ''));
+        let rest = tok.replace(/^\s+/, '');
+        while (!fits(rest) && rest.length > 1) {
+          const n = Math.max(1, Math.floor(limit / cw));
+          lines.push(rest.slice(0, n));
+          rest = rest.slice(n);
+        }
+        cur = rest;
+      }
+    });
+    if (cur.trim()) lines.push(cur.replace(/\s+$/, ''));
+    return lines.length ? lines : [s];
   }
-  function measureAction(action, showBody) {
-    const title = `${action.qualifier}  ${action.operand || ''}`.trim();
-    const raw = showBody && !action.isBoolean ? (action.body.length ? action.body : []) : [];
-    const lines = raw.flatMap(l => wrapLine(l, 42));
-    const lineW = Math.max(
-      168,
-      title.length * 7.4 + 36,
-      ...lines.map(l => l.length * 6.8 + 22)
-    );
-    const h = 22 + (lines.length ? 8 + lines.length * 14 : 0);
-    return { w: Math.min(420, lineW), h, lines };
+
+  function measureStepName(name) {
+    const pad = 22;
+    const minW = STEP_W;
+    const maxW = 248;
+    const natural = Math.min(maxW, Math.max(minW, String(name || '').length * 7.1 + pad));
+    let w = natural;
+    let lines = wrapToWidth(name, w - pad, 7.1);
+    if (lines.length > 2) {
+      w = maxW;
+      lines = wrapToWidth(name, w - pad, 7.1);
+    }
+    const h = Math.max(STEP_H, 20 + lines.length * 16);
+    return { w, h, lines };
+  }
+
+  function measureAction(action, showBody, maxW) {
+    const w = Math.max(80, Math.min(400, maxW || 220));
+    const inner = w - 18;
+    const nameLines = wrapToWidth(action.operand || '', inner - 26, 6.4);
+    const raw = showBody && !action.isBoolean ? (action.body || []) : [];
+    const lines = raw.flatMap(l => wrapToWidth(l, inner, 6.6));
+    const titleH = Math.max(22, 8 + nameLines.length * 14);
+    const bodyH = lines.length ? 6 + lines.length * 14 : 0;
+    return { w, h: titleH + bodyH, nameLines: nameLines.length ? nameLines : [''], lines, titleH };
+  }
+
+  function overlap(a, b, pad) {
+    const p = pad == null ? 4 : pad;
+    return a.x < b.x + b.w + p && a.x + a.w + p > b.x && a.y < b.y + b.h + p && a.y + a.h + p > b.y;
   }
 
   function layout(chart) {
     const boxes = {};
+    const stepList = [];
     chart.steps.forEach(step => {
-      const show = step.showActions;
-      const acts = step.actions.map(a => ({ action: a, m: measureAction(a, show) }));
-      const actH = acts.reduce((n, a) => n + a.m.h + 4, 0);
-      const actW = acts.reduce((n, a) => Math.max(n, a.m.w), 0);
+      const name = step.operand || `Step ${step.id}`;
+      const m = measureStepName(name);
       const x = sx(step.x);
       const y = sx(step.y);
-      boxes[step.id] = {
-        node: step,
-        x, y, w: STEP_W, h: STEP_H,
-        cx: x + STEP_W / 2,
-        cy: y + STEP_H / 2,
-        acts, actW, actH
+      const box = {
+        node: step, nameLines: m.lines,
+        x, y, w: m.w, h: m.h,
+        cx: x + m.w / 2, cy: y + m.h / 2,
+        acts: [], actW: 0, actH: 0, actX: x + m.w + 16, actY: y
       };
+      boxes[step.id] = box;
+      stepList.push(box);
     });
+
+    stepList.forEach(box => {
+      const others = stepList.filter(o => o !== box && o.x > box.x + 4);
+      const band = others.filter(o => o.y < box.y + box.h + 48 && o.y + o.h > box.y - 12);
+      const nextX = band.length ? Math.min(...band.map(o => o.x)) : Infinity;
+      const gap = Number.isFinite(nextX) ? nextX - (box.x + box.w) - 20 : 280;
+      if (gap > 0 && box.w > STEP_W && box.x + box.w > nextX - 8) {
+        const cap = Math.max(STEP_W, nextX - box.x - 12);
+        if (cap < box.w) {
+          const lines = wrapToWidth(box.node.operand || '', cap - 22, 7.1);
+          box.w = cap;
+          box.h = Math.max(STEP_H, 20 + lines.length * 16);
+          box.nameLines = lines;
+          box.cx = box.x + box.w / 2;
+          box.cy = box.y + box.h / 2;
+        }
+      }
+      const remain = Number.isFinite(nextX) ? nextX - (box.x + box.w) - 24 : 280;
+      const actMax = Math.max(72, Math.min(360, remain));
+      const show = box.node.showActions;
+      box.actX = box.x + box.w + 16;
+      box.actY = box.y;
+      box.acts = box.node.actions.map(a => ({ action: a, m: measureAction(a, show, actMax) }));
+      box.actW = box.acts.reduce((n, a) => Math.max(n, a.m.w), 0);
+      box.actH = box.acts.reduce((n, a) => n + a.m.h + 4, 0);
+    });
+
     chart.transitions.forEach(tr => {
       const x = sx(tr.x);
       const y = sx(tr.y);
       boxes[tr.id] = {
         node: tr,
         x, y, w: TRANS_W, h: 28,
-        cx: x + TRANS_W / 2, cy: y + 10
+        cx: x + TRANS_W / 2, cy: y + 10,
+        label: null
       };
     });
     chart.stops.forEach(st => {
       const x = sx(st.x);
       const y = sx(st.y);
-      boxes[st.id] = { node: st, x, y, w: 80, h: 36, cx: x + 40, cy: y + 18 };
+      const name = st.operand || 'Stop';
+      const w = Math.max(80, name.length * 7.1 + 20);
+      boxes[st.id] = { node: st, x, y, w, h: 36, cx: x + w / 2, cy: y + 18 };
     });
     chart.sbrRets.forEach(sb => {
       const x = sx(sb.x);
       const y = sx(sb.y);
-      boxes[sb.id] = { node: sb, x, y, w: 88, h: 48, cx: x + 44, cy: y + 24 };
+      const w = Math.max(88, Math.max(String(sb.inn||'').length, String(sb.ret||'').length) * 6.6 + 40);
+      boxes[sb.id] = { node: sb, x, y, w, h: 48, cx: x + w / 2, cy: y + 24 };
     });
     chart.textBoxes.forEach(tb => {
       const x = sx(tb.x);
       const y = sx(tb.y);
       const w = sx(tb.width) || 180;
-      const lines = (tb.text || '').split(/\n/);
+      const lines = wrapToWidth(tb.text || '', w - 16, 6.4);
       const h = Math.max(36, 16 + lines.length * 14);
       boxes[tb.id] = { node: tb, x, y, w, h, cx: x + w / 2, cy: y + h / 2, lines };
     });
+
+    function occupy() {
+      const rects = [];
+      Object.keys(boxes).forEach(id => {
+        const b = boxes[id];
+        if (!b || !b.node || b.node.kind === 'leg' || b.node.kind === 'branch' || b.node.kind === 'transition') return;
+        rects.push({ x: b.x, y: b.y, w: b.w, h: b.h, id: b.node.id });
+        if (b.acts && b.acts.length && b.actW) {
+          rects.push({ x: b.actX, y: b.actY, w: b.actW, h: Math.max(b.actH, b.h), id: b.node.id });
+        }
+      });
+      return rects;
+    }
+
+    const transBoxes = chart.transitions.map(tr => boxes[tr.id]).filter(Boolean).sort((a, b) => a.x - b.x || a.y - b.y);
+    transBoxes.forEach(box => {
+      const rects = occupy();
+      transBoxes.forEach(other => {
+        if (other !== box && other.label && other.label.r) rects.push(other.label.r);
+      });
+      const cx = box.cx;
+      const y = box.y;
+      const name = box.node.operand || '';
+      const rawCond = (box.node.condition || []).join(' ');
+      function attempt(side, maxW, yOff) {
+        const condLines = wrapToWidth(rawCond, maxW, 6.6);
+        const textW = Math.max(name.length * 6.2, ...condLines.map(l => l.length * 6.6), 36);
+        const textH = 12 + (name ? 12 : 0) + condLines.length * 13;
+        const lx = side === 'left' ? cx - 22 - textW : cx + 22;
+        const ly = y + (yOff || -2);
+        const r = { x: lx, y: ly, w: textW + 6, h: textH + 4, id: box.node.id };
+        const hit = rects.some(o => o.id !== box.node.id && overlap(r, o, 2));
+        return { hit, side, lx, ly, name, condLines, r };
+      }
+      let placed = attempt('right', 210, -2);
+      if (placed.hit) placed = attempt('left', 210, -2);
+      if (placed.hit) placed = attempt('right', 140, 22);
+      if (placed.hit) placed = attempt('left', 140, 22);
+      if (placed.hit) placed = attempt('right', 120, 26);
+      box.label = placed;
+    });
+
     chart.branches.forEach(br => {
       const linkedXs = [];
       chart.links.forEach(link => {
@@ -386,7 +497,7 @@
         if (other) linkedXs.push(other.cx);
       });
       br.legs.forEach(leg => {
-        if (boxes[leg.id]) linkedXs.push(boxes[leg.id].cx);
+        if (boxes[leg.id] && boxes[leg.id].cx) linkedXs.push(boxes[leg.id].cx);
       });
       const y = sx(br.y);
       const x0 = linkedXs.length ? Math.min(...linkedXs) : 80;
@@ -452,31 +563,46 @@
   function drawStep(box) {
     const s = box.node;
     const { x, y, w, h } = box;
+    const clip = `sfc-clip-${s.id}`;
     const parts = [];
+    parts.push(`<clipPath id="${clip}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="11" ry="11"/></clipPath>`);
     parts.push(`<rect class="sfc-box" x="${x}" y="${y}" width="${w}" height="${h}" rx="11" ry="11"/>`);
     if (s.initialStep) {
       parts.push(`<rect x="${x + 4}" y="${y + 4}" width="5" height="${h - 8}" rx="1" fill="${INK}"/>`);
     }
     parts.push(`<circle cx="${x + w / 2}" cy="${y}" r="3.2" fill="${PAPER}" stroke="${INK}" stroke-width="1.2"/>`);
     parts.push(`<circle cx="${x + w / 2}" cy="${y + h}" r="3.2" fill="${PAPER}" stroke="${INK}" stroke-width="1.2"/>`);
-    const name = s.operand || `Step ${s.id}`;
-    parts.push(`<text class="sfc-name" x="${x + w / 2}" y="${y + h / 2 + 4}">${esc(name)}</text>`);
-    let ay = y;
+    const names = box.nameLines && box.nameLines.length ? box.nameLines : [s.operand || `Step ${s.id}`];
+    const nameTop = y + h / 2 - (names.length - 1) * 8 + 4;
+    names.forEach((ln, i) => {
+      parts.push(`<text class="sfc-name" clip-path="url(#${clip})" x="${x + w / 2}" y="${nameTop + i * 16}">${esc(ln)}</text>`);
+    });
+    const ax = box.actX || x + w + 16;
+    let ay = box.actY || y;
     box.acts.forEach((item, i) => {
-      const ax = x + w + 18;
       const aw = item.m.w;
       const ah = item.m.h;
+      const aclip = `sfc-aclip-${s.id}-${i}`;
       if (i === 0) {
         parts.push(`<line class="sfc-wire" x1="${x + w}" y1="${y + h / 2}" x2="${ax}" y2="${y + h / 2}"/>`);
         parts.push(`<rect class="sfc-box" x="${ax - 6}" y="${y + h / 2 - 6}" width="12" height="12" rx="1"/>`);
       }
+      parts.push(`<clipPath id="${aclip}"><rect x="${ax}" y="${ay}" width="${aw}" height="${ah}"/></clipPath>`);
       parts.push(`<rect class="sfc-box" x="${ax}" y="${ay}" width="${aw}" height="${ah}" rx="1"/>`);
-      parts.push(`<text class="sfc-qual" x="${ax + 8}" y="${ay + 15}">${esc(item.action.qualifier)}</text>`);
-      parts.push(`<text class="sfc-label" x="${ax + 28}" y="${ay + 15}">${esc(item.action.operand)}</text>`);
+      const nameLines = item.m.nameLines || [item.action.operand];
+      nameLines.forEach((ln, li) => {
+        if (li === 0) {
+          parts.push(`<text class="sfc-qual" clip-path="url(#${aclip})" x="${ax + 8}" y="${ay + 15}">${esc(item.action.qualifier)}</text>`);
+          parts.push(`<text class="sfc-label" clip-path="url(#${aclip})" x="${ax + 28}" y="${ay + 15}">${esc(ln)}</text>`);
+        } else {
+          parts.push(`<text class="sfc-label" clip-path="url(#${aclip})" x="${ax + 28}" y="${ay + 15 + li * 14}">${esc(ln)}</text>`);
+        }
+      });
+      const titleH = item.m.titleH || 22;
       if (item.m.lines.length) {
-        parts.push(`<line class="sfc-wire" x1="${ax}" y1="${ay + 22}" x2="${ax + aw}" y2="${ay + 22}"/>`);
+        parts.push(`<line class="sfc-wire" x1="${ax}" y1="${ay + titleH}" x2="${ax + aw}" y2="${ay + titleH}"/>`);
         item.m.lines.forEach((ln, li) => {
-          parts.push(`<text class="sfc-st" x="${ax + 8}" y="${ay + 36 + li * 14}">${esc(ln)}</text>`);
+          parts.push(`<text class="sfc-st" clip-path="url(#${aclip})" x="${ax + 8}" y="${ay + titleH + 14 + li * 14}">${esc(ln)}</text>`);
         });
       }
       ay += ah + 4;
@@ -485,18 +611,24 @@
   }
 
   function drawTransition(box) {
-    const t = box.node;
     const cx = box.cx;
     const y = box.y;
     const parts = [
       `<line class="sfc-wire" x1="${cx - 18}" y1="${y + 8}" x2="${cx + 18}" y2="${y + 8}"/>`,
       `<path d="M ${cx} ${y + 8} L ${cx - 7} ${y + 20} L ${cx + 7} ${y + 20} Z" fill="${INK}"/>`
     ];
-    const nameX = cx + 26;
-    if (t.operand) parts.push(`<text class="sfc-label" x="${nameX}" y="${y + 7}">${esc(t.operand)}</text>`);
-    t.condition.forEach((ln, i) => {
-      parts.push(`<text class="sfc-st" x="${nameX}" y="${y + 22 + i * 13}">${esc(ln)}</text>`);
-    });
+    const lab = box.label;
+    if (lab) {
+      let ty = lab.ly + 12;
+      if (lab.name) {
+        parts.push(`<text class="sfc-label" x="${lab.lx}" y="${ty}">${esc(lab.name)}</text>`);
+        ty += 13;
+      }
+      (lab.condLines || []).forEach(ln => {
+        parts.push(`<text class="sfc-st" x="${lab.lx}" y="${ty}">${esc(ln)}</text>`);
+        ty += 13;
+      });
+    }
     return parts.join('');
   }
 
@@ -584,10 +716,11 @@
       const b = boxes[id];
       if (!b || b.node.kind === 'leg') return;
       const right = b.x + b.w + (b.actW ? b.actW + 24 : 0);
-      minX = Math.min(minX, b.x);
+      const bottom = b.y + Math.max(b.h, b.actH || 0) + (b.label && b.label.r ? b.label.r.h : 0);
+      minX = Math.min(minX, b.x, b.label && b.label.r ? b.label.r.x : b.x);
       minY = Math.min(minY, b.y);
-      maxX = Math.max(maxX, right);
-      maxY = Math.max(maxY, b.y + b.h);
+      maxX = Math.max(maxX, right, b.label && b.label.r ? b.label.r.x + b.label.r.w : right);
+      maxY = Math.max(maxY, bottom);
     });
     const pad = 36;
     const width = Math.max(640, Math.ceil(maxX - Math.min(0, minX) + pad * 2));
