@@ -5,8 +5,15 @@
   const $$ = (s, root = document) => [...root.querySelectorAll(s)];
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const SCALE_KEY = 'l5x-ld-scale-mode';
+  const NAV_KEY = 'l5x-ld-nav-collapse';
   const NOTE_SHEET_MIN = 920;
-  const state = { project: null, selected: null, tab: 'ladder', zoom: 1, showRaw: false, showRungMeta: true, scaleMode: (localStorage.getItem(SCALE_KEY)==='fit'?'fit':'fixed'), rendered: [], tagValues: {} };
+  const state = {
+    project: null, selected: null, tab: 'ladder', zoom: 1, showRaw: false, showRungMeta: true,
+    scaleMode: (localStorage.getItem(SCALE_KEY)==='fit'?'fit':'fixed'),
+    navCollapse: (function(){try{return localStorage.getItem(NAV_KEY)!=='0';}catch(e){return true;}})(),
+    navOpen: new Set(),
+    rendered: [], tagValues: {}
+  };
   const outputOps = new Set(['OTE','OTL','OTU','RES','MOV','COP','CPS','JSR','JMP','RET','SFR','FOR','BRK','FFL','FFU','BSL','BSR','SQL','SQO','FBC']);
   const contactOps = new Set(['XIC','XIO','ONS','OSR','OSF']);
   const compareOps = new Set(['EQU','NEQ','LES','LEQ','GRT','GEQ','LIM','MEQ','CMP']);
@@ -273,7 +280,7 @@
     if(!rungs.length)throw new Error('변환 가능한 로직 문장을 찾지 못했습니다.');
     const routine={id:'text-routine',name,type,program:'Text_Import',source,rungs,comments:[],origin:'text'};
     state.project={filename:`${name}.${type.toLowerCase()}`,name:'Text Logic',software:'',programs:[{name:'Text_Import',routines:[routine]}],all:[routine],tags:0,rungCount:rungs.length};
-    updateProjectUI();selectRoutine(routine);toast(`${rungs.length}개 LD Rung으로 변환했습니다.`);
+    updateProjectUI();toast(`${rungs.length}개 LD Rung으로 변환했습니다.`);
   }
 
   function loadFile(file) {
@@ -284,18 +291,55 @@
   function updateProjectUI(){
     const p=state.project, audit=auditProject(); $('#welcome').hidden=true; $('#viewer').hidden=false; $('#projectSummary').hidden=false;
     Object.entries(audit).forEach(([k,v])=>$('#viewer').dataset[k]=String(v));
-    $('#fileBadge').textContent=`${p.name} · ${p.filename}`; $('#routineCount').textContent=p.all.length; $('#rungCount').textContent=p.rungCount; $('#tagCount').textContent=p.tags; $('#searchInput').disabled=false;$('#searchInput').value='';renderTree();
-    const first=p.all.find(r=>r.type==='RLL')||p.all[0]; if(first) selectRoutine(first);
+    $('#fileBadge').textContent=`${p.name} · ${p.filename}`; $('#routineCount').textContent=p.all.length; $('#rungCount').textContent=p.rungCount; $('#tagCount').textContent=p.tags; $('#searchInput').disabled=false;$('#searchInput').value='';
+    seedNavOpen();
+    const navEl=$('#navCollapse'); if(navEl) navEl.checked=state.navCollapse;
+    renderTree();
+    const first=p.all.find(r=>r.type==='RLL')||p.all[0]; if(first) selectRoutine(first,{keepTree:true});
+  }
+  function seedNavOpen(){
+    if(!state.project){state.navOpen=new Set();return;}
+    if(state.navCollapse) state.navOpen=new Set();
+    else state.navOpen=new Set(state.project.programs.map(p=>p.name));
+  }
+  function setNavCollapse(on){
+    state.navCollapse=!!on;
+    try{localStorage.setItem(NAV_KEY,state.navCollapse?'1':'0');}catch(err){}
+    seedNavOpen();
+    if(state.project) renderTree($('#searchInput')?$('#searchInput').value:'');
+  }
+  function markActiveRoutine(){
+    $$('#routineTree .routine-item').forEach(b=>b.classList.toggle('active',!!state.selected&&b.dataset.rid===String(state.selected.id)));
   }
   function renderTree(filter=''){
-    const q=filter.trim().toLowerCase(); const root=$('#routineTree'); root.innerHTML='';
+    const q=filter.trim().toLowerCase(); const root=$('#routineTree'); if(!root||!state.project)return;
+    const scroll=root.scrollTop;
+    root.innerHTML='';
     state.project.programs.forEach((p,pi)=>{
       const routines=p.routines.filter(r=>!q||`${p.name} ${r.name} ${r.type}`.toLowerCase().includes(q)); if(!routines.length)return;
-      const g=document.createElement('section');g.className='program-group';g.innerHTML=`<button class="program-head"><span class="program-name">${esc(p.name)}</span><span>${routines.length}</span></button><div class="routine-list"></div>`;
-      const list=$('.routine-list',g); routines.forEach(r=>{const b=document.createElement('button');b.className='routine-item'+(state.selected===r?' active':'');b.innerHTML=`<span class="mini-type">${esc(r.type)}</span><span class="name">${esc(r.name)}</span>`;b.onclick=()=>selectRoutine(r);list.appendChild(b);});
-      $('.program-head',g).onclick=e=>{e.currentTarget.classList.toggle('closed');list.hidden=!list.hidden};root.appendChild(g);
+      const open=state.navOpen.has(p.name);
+      const g=document.createElement('section');g.className='program-group';
+      g.innerHTML=`<button type="button" class="program-head${open?'':' closed'}" data-program="${esc(p.name)}"><span class="program-name">${esc(p.name)}</span><span>${routines.length}</span></button><div class="routine-list"></div>`;
+      const list=$('.routine-list',g); list.hidden=!open;
+      routines.forEach(r=>{
+        const b=document.createElement('button');b.type='button';
+        b.className='routine-item'+(state.selected===r?' active':'');
+        b.dataset.rid=r.id;
+        b.innerHTML=`<span class="mini-type">${esc(r.type)}</span><span class="name">${esc(r.name)}</span>`;
+        b.onclick=()=>selectRoutine(r,{keepTree:true});
+        list.appendChild(b);
+      });
+      $('.program-head',g).onclick=e=>{
+        const name=p.name;
+        const willOpen=!state.navOpen.has(name);
+        if(willOpen) state.navOpen.add(name); else state.navOpen.delete(name);
+        e.currentTarget.classList.toggle('closed',!willOpen);
+        list.hidden=!willOpen;
+      };
+      root.appendChild(g);
     });
     if(!root.children.length)root.innerHTML='<div class="empty-side">일치하는 루틴이 없습니다.</div>';
+    root.scrollTop=scroll;
   }
   function setChartToolbar(type){
     const sfc=type==='SFC';
@@ -308,7 +352,22 @@
     const tab=document.querySelector('.tab[data-tab="ladder"]');
     if(tab)tab.textContent=sfc?'SFC':'Ladder';
   }
-  function selectRoutine(r){state.selected=r;renderTree($('#searchInput').value);$('#breadcrumb').textContent=`${state.project.name} / Programs / ${r.program}`;$('#routineTitle').textContent=r.name;$('#typeBadge').textContent=r.type;$('#routineMeta').textContent=metaText(r);$('#sourceCode').textContent=r.source||'표시할 원본 로직이 없습니다.';setChartToolbar(r.type);renderRoutine();setTab(r.type==='ST'?'source':'ladder');}
+  function selectRoutine(r,opts){
+    if(!r)return;
+    state.selected=r;
+    if(opts&&opts.keepTree) markActiveRoutine();
+    else renderTree($('#searchInput')?$('#searchInput').value:'');
+    $('#breadcrumb').textContent=`${state.project.name} / Programs / ${r.program}`;
+    $('#routineTitle').textContent=r.name;
+    $('#typeBadge').textContent=r.type;
+    $('#routineMeta').textContent=metaText(r);
+    $('#sourceCode').textContent=r.source||'표시할 원본 로직이 없습니다.';
+    setChartToolbar(r.type);
+    renderRoutine();
+    if(r.type==='ST') setTab('source');
+    else if(state.tab==='source'||state.tab==='report') setTab(state.tab);
+    else setTab('ladder');
+  }
   function metaText(r){if(r.type==='RLL')return `${r.rungs.length} Rungs · ${r.origin==='text'?'텍스트 RLL 변환':'원본 RLL'}`;if(r.type==='ST')return 'Structured Text 원문 보존';if(r.type==='SFC'){const c=r.sfc;return c?`SFC · 스텝 ${c.steps.length} · 트랜지션 ${c.transitions.length}`:'Sequential Function Chart';}return `${r.type} 루틴 · 원본 구조 보존`;}
   function renderSfcSheet(r){
     const canvas=$('#ladderCanvas');
@@ -408,6 +467,8 @@
   if($('#fileInput')){
     $('#fileInput').addEventListener('change',e=>e.target.files[0]&&loadFile(e.target.files[0]));
     $('#searchInput').addEventListener('input',e=>renderTree(e.target.value));
+    const navEl=$('#navCollapse');
+    if(navEl){navEl.checked=state.navCollapse;navEl.addEventListener('change',()=>setNavCollapse(navEl.checked));}
     $$('.tab').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
     $('#zoomRange').addEventListener('input',e=>{state.zoom=+e.target.value/100;renderRoutine()});
     const scaleEl=$('#scaleMode');
