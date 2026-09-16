@@ -49,7 +49,7 @@ XIC(Start_PB)XIO(Stop_PB)OTE(Motor_Run);
 
 ## 정확도
 
-래더 변환 대상은 RLL 루틴과 직접 입력한 RLL Neutral Text입니다. SFC는 LD로 바꾸지 않고 매뉴얼 기호로 차트를 그립니다. ST는 원문을 보존하고 구문만 색으로 구분합니다.
+래더 변환 대상은 RLL 루틴과 직접 입력한 RLL Neutral Text입니다. SFC는 LD로 바꾸지 않고 매뉴얼 기호로 차트를 그립니다. ST 루틴만 원문을 보존한 채 구문을 색으로 구분하고, SFC 차트 글자는 원래 색을 유지합니다.
 
 ## 로컬 파일
 
