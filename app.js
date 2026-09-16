@@ -178,18 +178,36 @@
     if (!node || node.type === 'instruction') {
       const block = node && (timerOps.has(node.op) || compareOps.has(node.op) || (!contactOps.has(node.op) && !outputOps.has(node.op)));
       const longest = Math.max(node?.op.length || 3, ...(node?.args || []).map(a => a.length));
-      if (node?.op === 'JSR') return {w:Math.max(232,longest*7+110),h:108};
-      if (node?.op === 'SFR') return {w:Math.max(218,longest*7+110),h:92};
-      return block
-        ? {w:Math.max(178,longest*7+76),h:Math.max(84,52+(node?.args.length||0)*20)}
-        : {w:Math.max(116,longest*7+44),h:72};
+      const h = node?.op === 'JSR' ? 108
+        : node?.op === 'SFR' ? 92
+        : block ? Math.max(84,52+(node?.args.length||0)*20) : 72;
+      const w = node?.op === 'JSR' ? Math.max(232,longest*7+110)
+        : node?.op === 'SFR' ? Math.max(218,longest*7+110)
+        : block ? Math.max(178,longest*7+76) : Math.max(116,longest*7+44);
+      return {w,h,top:-h/2,bottom:h/2};
     }
     if (node.type === 'sequence') {
       const ms = node.children.map(measure);
-      return { w: Math.max(48, ms.reduce((n,m)=>n+m.w,0) + Math.max(0,ms.length-1)*18), h: Math.max(72, ...ms.map(m=>m.h)) };
+      const top = Math.min(-36, ...ms.map(m=>m.top));
+      const bottom = Math.max(36, ...ms.map(m=>m.bottom));
+      return { w: Math.max(48, ms.reduce((n,m)=>n+m.w,0) + Math.max(0,ms.length-1)*18), h: bottom-top, top, bottom };
     }
     const ms = node.branches.map(measure);
-    return { w: Math.max(104, ...ms.map(m=>m.w)), h: Math.max(72, ms.reduce((n,m)=>n+m.h,0) + Math.max(0,ms.length-1)*BRANCH_GAP) };
+    const offsets = branchOffsets(ms);
+    const top = Math.min(-36, ...ms.map((m,i)=>offsets[i]+m.top));
+    const bottom = Math.max(36, ...ms.map((m,i)=>offsets[i]+m.bottom));
+    return { w: Math.max(104, ...ms.map(m=>m.w)), h: bottom-top, top, bottom };
+  }
+  /* A branch is not vertically centred: its first path stays on the rung and
+     every additional path is added below it.  Keep this geometry shared by
+     measurement and drawing; otherwise a deep JSR branch can exceed SVG H. */
+  function branchOffsets(measures) {
+    let previousBottom = -Infinity;
+    return measures.map((m, i) => {
+      const offset = i === 0 ? 0 : previousBottom + BRANCH_GAP - m.top;
+      previousBottom = offset + m.bottom;
+      return offset;
+    });
   }
   function leafCount(node){if(node.type==='instruction')return 1;if(node.type==='sequence')return node.children.reduce((n,x)=>n+leafCount(x),0);return Math.max(0,...node.branches.map(leafCount));}
   const BRANCH_GAP = 88;
@@ -218,13 +236,14 @@
     const rows = wrapSequence(ast, Math.max(240, sheetDrawW - foldInset * 2));
     const W = rows.length > 1 ? sheetW : Math.max(contentW, sheetW);
     const railR = W - pad, nodeL = railL + nodePadL, nodeR = W - pad - nodePadR, drawW = nodeR - nodeL;
-    const rowHeights = rows.map(row => Math.max(142, measure(row).h + 82));
-    const H = rowHeights.reduce((n,h)=>n+h,0), y = 60;
-    const indexText = showIndex ? `<text class="rung-index" x="18" y="${y+4}">${esc(rung.number)}</text>` : '';
+    const rowMeasures = rows.map(measure);
+    const rowHeights = rowMeasures.map(m => Math.max(142, m.h + 64));
+    const H = rowHeights.reduce((n,h)=>n+h,0);
+    const indexText = showIndex ? `<text class="rung-index" x="18" y="64">${esc(rung.number)}</text>` : '';
     const parts = [`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Rung ${esc(rung.number)} ladder diagram">`, svgDefs(), `${indexText}<line class="rail" x1="${railL}" y1="0" x2="${railL}" y2="${H}"/><line class="rail" x1="${railR}" y1="0" x2="${railR}" y2="${H}"/>`];
     const foldL = railL + foldInset, foldR = railR - foldInset;
     let top = 0;
-    rows.forEach((row,i)=>{const cy=top+y;const rowL=i===0?nodeL:foldL;const rowR=i===rows.length-1?nodeR:foldR;const rowW=rowR-rowL;if(i===0)parts.push(`<line class="wire" x1="${railL}" y1="${cy}" x2="${rowL}" y2="${cy}"/>`);renderRoot(row,rowL,cy,rowW,parts);if(i===rows.length-1)parts.push(`<line class="wire" x1="${rowR}" y1="${cy}" x2="${railR}" y2="${cy}"/>`);if(i<rows.length-1){const turnY=top+rowHeights[i]-18;parts.push(`<line class="wire" x1="${foldR}" y1="${cy}" x2="${foldR}" y2="${turnY}"/>`);continuationDown(parts,foldR,cy,turnY);continuationArrow(parts,foldR,foldL,turnY);parts.push(`<line class="wire" x1="${foldL}" y1="${turnY}" x2="${foldL}" y2="${top+rowHeights[i]+y}"/>`);}top+=rowHeights[i];});
+    rows.forEach((row,i)=>{const cy=top+32-rowMeasures[i].top;const rowL=i===0?nodeL:foldL;const rowR=i===rows.length-1?nodeR:foldR;const rowW=rowR-rowL;if(i===0)parts.push(`<line class="wire" x1="${railL}" y1="${cy}" x2="${rowL}" y2="${cy}"/>`);renderRoot(row,rowL,cy,rowW,parts);if(i===rows.length-1)parts.push(`<line class="wire" x1="${rowR}" y1="${cy}" x2="${railR}" y2="${cy}"/>`);if(i<rows.length-1){const turnY=top+rowHeights[i]-18;const nextCy=top+rowHeights[i]+32-rowMeasures[i+1].top;parts.push(`<line class="wire" x1="${foldR}" y1="${cy}" x2="${foldR}" y2="${turnY}"/>`);continuationDown(parts,foldR,cy,turnY);continuationArrow(parts,foldR,foldL,turnY);parts.push(`<line class="wire" x1="${foldL}" y1="${turnY}" x2="${foldL}" y2="${nextCy}"/>`);}top+=rowHeights[i];});
     parts.push('</svg>');
     const warnings = [...parser.warnings];
     return { svg: parts.join(''), ast, warnings, rung, index, width:W };
@@ -261,11 +280,10 @@
       node.children.forEach((child,i) => { const w = width * ms[i].w / natural; renderNode(child, xx, cy, w, out); xx += w; });
       if (!node.children.length) out.push(`<line class="wire" x1="${x}" y1="${cy}" x2="${x+width}" y2="${cy}"/>`); return;
     }
-    const ms = node.branches.map(measure), gap = BRANCH_GAP;
+    const ms = node.branches.map(measure);
     /* Do not center branches around the main line.  The first branch is the
        main rung and every additional path is routed downward like Logix. */
-    let yy = cy; const centers = [];
-    node.branches.forEach((b,i)=>{ centers.push(i===0 ? cy : yy + ms[i].h/2 - 36); yy += ms[i].h + gap; });
+    const centers = branchOffsets(ms).map(offset => cy + offset);
     if (centers.length) {
       const top = cy, bottom = centers.at(-1);
       out.push(`<line class="wire" x1="${x}" y1="${top}" x2="${x}" y2="${bottom}"/><line class="wire" x1="${x+width}" y1="${top}" x2="${x+width}" y2="${bottom}"/>`);
