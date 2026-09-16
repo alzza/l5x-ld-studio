@@ -620,7 +620,8 @@
       if (item.m.lines.length) {
         parts.push(`<line class="sfc-wire" x1="${ax}" y1="${ay + titleH}" x2="${ax + aw}" y2="${ay + titleH}"/>`);
         item.m.lines.forEach((ln, li) => {
-          parts.push(`<text class="sfc-st" clip-path="url(#${aclip})" x="${ax + 8}" y="${ay + titleH + 14 + li * 14}">${esc(ln)}</text>`);
+          const inner = (globalThis.L5XST && L5XST.svgTspans) ? L5XST.svgTspans(ln) : esc(ln);
+          parts.push(`<text class="sfc-st" clip-path="url(#${aclip})" x="${ax + 8}" y="${ay + titleH + 14 + li * 14}">${inner}</text>`);
         });
       }
       ay += ah + 4;
@@ -643,7 +644,8 @@
         ty += 13;
       }
       (lab.condLines || []).forEach(ln => {
-        parts.push(`<text class="sfc-st" x="${lab.lx}" y="${ty}">${esc(ln)}</text>`);
+        const inner = (globalThis.L5XST && L5XST.svgTspans) ? L5XST.svgTspans(ln) : esc(ln);
+        parts.push(`<text class="sfc-st" x="${lab.lx}" y="${ty}">${inner}</text>`);
         ty += 13;
       });
     }
