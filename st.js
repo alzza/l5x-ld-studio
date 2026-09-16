@@ -143,6 +143,20 @@
     return out;
   }
 
+  function compactSource(src) {
+    const lines = String(src || '')
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      .split('\n')
+      .map(l => l.replace(/[ \t]+$/, ''));
+    const out = [];
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i] === '') continue;
+      out.push(lines[i]);
+    }
+    return out.join('\n');
+  }
+
   function tokenHtml(tok) {
     if (tok.type === 'nl') return '';
     if (tok.type === 'ws') return esc(tok.text);
@@ -151,7 +165,7 @@
   }
 
   function highlightHtml(src) {
-    const tokens = tokenize(src);
+    const tokens = tokenize(compactSource(src));
     const lines = [[]];
     tokens.forEach(tok => {
       if (tok.type === 'nl') lines.push([]);
@@ -176,7 +190,7 @@
     }).join('');
   }
 
-  const api = { tokenize, highlightHtml, svgTspans, COLORS };
+  const api = { tokenize, highlightHtml, svgTspans, compactSource, COLORS };
   global.L5XST = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -127,8 +127,9 @@
           }));
           item.source = item.rungs.map(r => `Rung ${r.number}:\n${r.text}`).join('\n\n');
         } else if (type === 'ST') {
-          const lines = $$(':scope > STContent > Line', routine).map(l => ({ number: l.getAttribute('Number'), text: l.textContent || '' }));
-          item.source = lines.map(l => l.text).join('\n');
+          const lines = $$(':scope > STContent > Line', routine).map(l => String(l.textContent || '').replace(/\r\n/g, '\n').replace(/\r/g, '').replace(/\n+$/, ''));
+          const joined = lines.join('\n');
+          item.source = (globalThis.L5XST && L5XST.compactSource) ? L5XST.compactSource(joined) : joined.replace(/\n{2,}/g, '\n');
         } else if (type === 'SFC') {
           item.sfc = (globalThis.L5XSFC && typeof L5XSFC.parseSFC === 'function') ? L5XSFC.parseSFC(routine) : null;
           item.source = serializeRoutineXML(routine);
