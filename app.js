@@ -179,6 +179,7 @@
       const block = node && (timerOps.has(node.op) || compareOps.has(node.op) || (!contactOps.has(node.op) && !outputOps.has(node.op)));
       const longest = Math.max(node?.op.length || 3, ...(node?.args || []).map(a => a.length));
       if (node?.op === 'JSR') return {w:Math.max(232,longest*7+110),h:108};
+      if (node?.op === 'SFR') return {w:Math.max(218,longest*7+110),h:92};
       return block
         ? {w:Math.max(178,longest*7+76),h:Math.max(84,52+(node?.args.length||0)*20)}
         : {w:Math.max(116,longest*7+44),h:72};
@@ -217,8 +218,8 @@
     const rows = wrapSequence(ast, Math.max(240, sheetDrawW - foldInset * 2));
     const W = rows.length > 1 ? sheetW : Math.max(contentW, sheetW);
     const railR = W - pad, nodeL = railL + nodePadL, nodeR = W - pad - nodePadR, drawW = nodeR - nodeL;
-    const rowHeights = rows.map(row => Math.max(118, measure(row).h + 54));
-    const H = rowHeights.reduce((n,h)=>n+h,0), y = 42;
+    const rowHeights = rows.map(row => Math.max(142, measure(row).h + 82));
+    const H = rowHeights.reduce((n,h)=>n+h,0), y = 60;
     const indexText = showIndex ? `<text class="rung-index" x="18" y="${y+4}">${esc(rung.number)}</text>` : '';
     const parts = [`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Rung ${esc(rung.number)} ladder diagram">`, svgDefs(), `${indexText}<line class="rail" x1="${railL}" y1="0" x2="${railL}" y2="${H}"/><line class="rail" x1="${railR}" y1="0" x2="${railR}" y2="${H}"/>`];
     const foldL = railL + foldInset, foldR = railR - foldInset;
@@ -229,7 +230,7 @@
     return { svg: parts.join(''), ast, warnings, rung, index, width:W };
   }
 
-  function svgDefs() { return `<defs><marker id="arrow-left" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M 8 0 L 0 4 L 8 8" fill="none" stroke="#243b7a" stroke-width="1.2"/></marker></defs><style>.wire,.rail,.device{fill:none;stroke:#243b7a;stroke-width:1.45;vector-effect:non-scaling-stroke}.wire.active,.device.active{stroke:#15b84e;stroke-width:4}.rail{stroke:#243b7a;stroke-width:1.7}.junction{fill:#243b7a}.rung-index{font:14px Georgia,'Times New Roman',serif;fill:#243b7a}.label{font:13px Arial,'Segoe UI',sans-serif;fill:#111;text-anchor:middle}.op{font:700 10px Arial,'Segoe UI',sans-serif;fill:#243b7a;text-anchor:middle}.jsr-description{font:11px Arial,'Segoe UI',sans-serif;fill:#243b7a;text-anchor:middle}.jsr-block{stroke-width:1.45}.mnemonic{fill:#243b7a}.arg-label{font:11px Arial,'Segoe UI',sans-serif;fill:#243b7a}.arg-value{font:12px Arial,'Segoe UI',sans-serif;fill:#111;text-anchor:end}.block{fill:#fff;stroke:#243b7a;stroke-width:1.25}.divider{stroke:#243b7a;stroke-width:1}.unknown{fill:#fff8e8;stroke:#9a6b18}</style>`; }
+  function svgDefs() { return `<defs><marker id="arrow-left" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M 8 0 L 0 4 L 8 8" fill="none" stroke="#243b7a" stroke-width="1.2"/></marker></defs><style>.wire,.rail,.device{fill:none;stroke:#243b7a;stroke-width:1.45;vector-effect:non-scaling-stroke}.wire.active,.device.active{stroke:#15b84e;stroke-width:4}.rail{stroke:#243b7a;stroke-width:1.7}.junction{fill:#243b7a}.rung-index{font:14px Georgia,'Times New Roman',serif;fill:#243b7a}.label{font:13px Arial,'Segoe UI',sans-serif;fill:#111;text-anchor:middle}.op{font:700 10px Arial,'Segoe UI',sans-serif;fill:#243b7a;text-anchor:middle}.jsr-description,.sfr-description{font:11px Arial,'Segoe UI',sans-serif;fill:#243b7a;text-anchor:middle}.jsr-block,.sfr-block{stroke-width:1.45}.mnemonic{fill:#243b7a}.arg-label{font:11px Arial,'Segoe UI',sans-serif;fill:#243b7a}.arg-value{font:12px Arial,'Segoe UI',sans-serif;fill:#111;text-anchor:end}.block{fill:#fff;stroke:#243b7a;stroke-width:1.25}.divider{stroke:#243b7a;stroke-width:1}.unknown{fill:#fff8e8;stroke:#9a6b18}</style>`; }
   function isActionNode(node){
     if(node.type==='instruction')return outputOps.has(node.op)||timerOps.has(node.op)||['ADD','SUB','MUL','DIV','ABS','CPT','CLR','SWPB','OR','PID','MSG'].includes(node.op);
     if(node.type==='sequence')return node.children.length>0&&isActionNode(node.children.at(-1));
@@ -292,6 +293,14 @@
       const bw=Math.min(width-18,desired),bh=108,bx=cx-bw/2,by=cy-bh/2;
       out.push(`<title>JSR · Jump To Subroutine · ${esc(n.raw)}</title><rect class="block jsr-block" x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="1"/><text class="op mnemonic" x="${cx}" y="${by+13}">JSR</text><text class="jsr-description" x="${cx}" y="${by+29}">Jump To Subroutine</text><line class="divider" x1="${bx}" y1="${by+36}" x2="${bx+bw}" y2="${by+36}"/>`);
       fields.forEach(([k,v],i)=>{const yy=by+55+i*17;out.push(`<text class="arg-label" x="${bx+8}" y="${yy}">${esc(k)}</text><text class="arg-value" x="${bx+bw-8}" y="${yy}">${esc(String(v))}</text>`);});
+      out.push(`<line class="wire" x1="${wireL}" y1="${cy}" x2="${bx}" y2="${cy}"/><line class="wire" x1="${bx+bw}" y1="${cy}" x2="${wireR}" y2="${cy}"/>`); return;
+    }
+    if (n.op === 'SFR') {
+      const fields=[['SFC Routine Name',n.args[0]||'?'],['Step Name',n.args[1]||'?']];
+      const desired=Math.max(218,...fields.map(([k,v])=>Math.max(k.length*7+18,String(v).length*7+18)+34));
+      const bw=Math.min(width-18,desired),bh=92,bx=cx-bw/2,by=cy-bh/2;
+      out.push(`<title>SFR · SFC Reset · ${esc(n.raw)}</title><rect class="block sfr-block" x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="1"/><text class="op mnemonic" x="${cx}" y="${by+13}">SFR</text><text class="sfr-description" x="${cx}" y="${by+29}">SFC Reset</text><line class="divider" x1="${bx}" y1="${by+36}" x2="${bx+bw}" y2="${by+36}"/>`);
+      fields.forEach(([k,v],i)=>{const yy=by+56+i*18;out.push(`<text class="arg-label" x="${bx+8}" y="${yy}">${esc(k)}</text><text class="arg-value" x="${bx+bw-8}" y="${yy}">${esc(String(v))}</text>`);});
       out.push(`<line class="wire" x1="${wireL}" y1="${cy}" x2="${bx}" y2="${cy}"/><line class="wire" x1="${bx+bw}" y1="${cy}" x2="${wireR}" y2="${cy}"/>`); return;
     }
     const m=measure(n), bh=Math.min(m.h-8,Math.max(54,30+n.args.length*21)), bw=Math.min(width-18,Math.max(138,m.w-20)), bx=cx-bw/2, by=cy-bh/2;
