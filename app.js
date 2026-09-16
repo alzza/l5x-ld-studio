@@ -555,7 +555,7 @@
     if(r.type==='SFC'){renderSfcSheet(r);return;}
     if(r.type!=='RLL'){canvas.innerHTML=`<div class="report-card"><h3>${esc(r.type)} 원본 보존</h3><p>이 형식은 래더로 변환하지 않습니다. 원본 로직 탭에서 그대로 확인할 수 있습니다.</p></div>`;$('#conversionBadge').textContent='원본 보존';renderReport();return;}
     const sheet=document.createElement('div');sheet.className='ladder-sheet logix-page';sheet.dataset.scaleMode=state.scaleMode;
-    const viewportWidth=state.scaleMode==='fixed'?NOTE_SHEET_MIN:Math.max(1040,(canvas.clientWidth-38)/state.zoom);
+    const viewportWidth=state.scaleMode==='fixed'?Math.max(320,Math.min(NOTE_SHEET_MIN,canvas.clientWidth-38)):Math.max(320,(canvas.clientWidth-38)/state.zoom);
     const now=new Date().toLocaleString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
     sheet.innerHTML=`<header class="logix-print-head"><div><strong>${esc(r.name)} - Ladder Diagram</strong><span>${esc(state.project.name)}:${esc(r.program)}:${esc(r.name)}</span><span>Total number of rungs in routine: ${r.rungs.length}</span></div><div><b>Page 1</b><span>${esc(now)}</span><span>${esc(state.project.filename)}</span></div></header><div class="logix-rule"></div><section class="logix-rungs"></section>`;
     const rungRoot=$('.logix-rungs',sheet);
@@ -645,7 +645,7 @@
     $('#textDialogClose').onclick=()=>textDialog.close();
     $('#textConvertBtn').onclick=()=>{try{loadTextLogic($('#textRoutineName').value,$('#textLogicInput').value);textDialog.close();}catch(e){toast(e.message,true);}};
     let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(state.selected&&!$('#viewer').hidden)renderRoutine();},180)});
-    if(window.ResizeObserver){const canvas=$('#ladderCanvas');let observedWidth=0;const ro=new ResizeObserver(entries=>{const w=Math.round(entries[0]?.contentRect?.width||0);if(!w||w===observedWidth)return;observedWidth=w;clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(state.selected&&!$('#viewer').hidden&&state.scaleMode==='fit')renderRoutine();},80);});if(canvas)ro.observe(canvas);}
+    if(window.ResizeObserver){const canvas=$('#ladderCanvas');let observedWidth=0;const ro=new ResizeObserver(entries=>{const w=Math.round(entries[0]?.contentRect?.width||0);if(!w||w===observedWidth)return;observedWidth=w;clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(state.selected&&!$('#viewer').hidden)renderRoutine();},80);});if(canvas)ro.observe(canvas);}
     const dz=$('#dropZone');['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag')}));['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('drag')}));dz.addEventListener('drop',e=>e.dataTransfer.files[0]&&loadFile(e.dataTransfer.files[0]));
     const clearBtn=$('#clearProjectBtn');
     if(clearBtn) clearBtn.addEventListener('click',()=>clearLoadedProject());
