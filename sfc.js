@@ -55,7 +55,12 @@
     if (!block) return [];
     const content = find(block, 'STContent') || block.querySelector && block.querySelector('STContent');
     if (!content) return [];
-    return kids(content, 'Line').map(line => (line.textContent || '').replace(/\r\n/g, '\n'));
+    const blank = globalThis.L5XST && L5XST.isBlankLine
+      ? L5XST.isBlankLine
+      : (t => !String(t || '').trim());
+    return kids(content, 'Line')
+      .map(line => (line.textContent || '').replace(/\r\n/g, '\n').replace(/\r/g, ''))
+      .filter(t => !blank(t));
   }
   function textBoxValue(el) {
     const text = find(el, 'Text');

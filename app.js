@@ -132,9 +132,9 @@
           }));
           item.source = item.rungs.map(r => `Rung ${r.number}:\n${r.text}`).join('\n\n');
         } else if (type === 'ST') {
-          const lines = $$(':scope > STContent > Line', routine).map(l => String(l.textContent || '').replace(/\r\n/g, '\n').replace(/\r/g, '').replace(/\n+$/, ''));
+          const lines = $$(':scope > STContent > Line', routine).map(readSTLine);
           const joined = lines.join('\n');
-          item.source = (globalThis.L5XST && L5XST.compactSource) ? L5XST.compactSource(joined) : joined.replace(/\n{2,}/g, '\n');
+          item.source = (globalThis.L5XST && L5XST.compactSource) ? L5XST.compactSource(joined) : joined.split('\n').filter(l => l.trim()).join('\n');
         } else if (type === 'SFC') {
           item.sfc = (globalThis.L5XSFC && typeof L5XSFC.parseSFC === 'function') ? L5XSFC.parseSFC(routine) : null;
           item.source = serializeRoutineXML(routine);
@@ -157,6 +157,19 @@
 
   function serializeRoutineXML(routine) {
     return new XMLSerializer().serializeToString(routine).replace(/></g, '>\n<');
+  }
+  function readSTLine(el) {
+    let raw = '';
+    for (let n = el.firstChild; n; n = n.nextSibling) {
+      if (n.nodeType === 3 || n.nodeType === 4) raw += n.nodeValue || '';
+    }
+    if (!raw) raw = el.textContent || '';
+    raw = String(raw).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    if (globalThis.L5XST && L5XST.isBlankLine ? L5XST.isBlankLine(raw) : !raw.trim()) return '';
+    const parts = raw.split('\n');
+    if (parts.length > 1 && !(parts[0] || '').trim()) parts.shift();
+    if (parts.length > 1 && !(parts[parts.length - 1] || '').trim()) parts.pop();
+    return parts.join('\n').replace(/[ \t]+$/gm, '');
   }
 
   /* Logix Designer uses a fixed horizontal signal path.  Parallel paths keep

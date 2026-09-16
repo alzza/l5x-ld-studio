@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>L5X Ladder Studio — SFC Sample</title>
-  <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="app.css?v=20260916st2">
 </head>
 <body>
   <div class="app-shell">
@@ -109,14 +109,14 @@
     </form>
   </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="st.js"></script>
-  <script src="sfc.js"></script>
+  <script src="st.js?v=20260916st2"></script>
+  <script src="sfc.js?v=20260916st2"></script>
   <script>
     window.LD_PRELOAD_NAME = 'sample-sfc.xml';
     fetch('sample-sfc.xml').then(function (r) { return r.text(); }).then(function (xml) {
       window.LD_PRELOAD_L5X = xml;
       var s = document.createElement('script');
-      s.src = 'app.js';
+      s.src = 'app.js?v=20260916st2';
       document.body.appendChild(s);
     }).catch(function (e) {
       document.getElementById('ladderCanvas').innerHTML = '<div class="report-card"><h3>샘플 SFC를 읽지 못했습니다.</h3><p>' + String(e) + '</p></div>';

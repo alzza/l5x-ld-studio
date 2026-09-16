@@ -143,18 +143,18 @@
     return out;
   }
 
+  const BLANK_RE = /[\s\u00A0\u1680\u2000-\u200D\u2028\u2029\u202F\u205F\u3000\uFEFF]/g;
+  function isBlankLine(l) {
+    return !String(l || '').replace(BLANK_RE, '');
+  }
   function compactSource(src) {
-    const lines = String(src || '')
+    return String(src || '')
       .replace(/\r\n/g, '\n')
       .replace(/\r/g, '\n')
       .split('\n')
-      .map(l => l.replace(/[ \t]+$/, ''));
-    const out = [];
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i] === '') continue;
-      out.push(lines[i]);
-    }
-    return out.join('\n');
+      .filter(l => !isBlankLine(l))
+      .map(l => l.replace(/[ \t\u00A0]+$/g, ''))
+      .join('\n');
   }
 
   function tokenHtml(tok) {
@@ -171,8 +171,10 @@
       if (tok.type === 'nl') lines.push([]);
       else lines[lines.length - 1].push(tok);
     });
-    const width = String(Math.max(1, lines.length)).length;
-    return lines.map((toks, i) => {
+    const kept = lines.filter(toks => !isBlankLine(toks.map(t => t.text).join('')));
+    const rows = kept.length ? kept : [[]];
+    const width = String(Math.max(1, rows.length)).length;
+    return rows.map((toks, i) => {
       const ln = String(i + 1).padStart(width, ' ');
       const code = toks.map(tokenHtml).join('') || ' ';
       return `<div class="st-line"><span class="st-ln">${ln}</span><span class="st-code">${code}</span></div>`;
@@ -190,7 +192,7 @@
     }).join('');
   }
 
-  const api = { tokenize, highlightHtml, svgTspans, compactSource, COLORS };
+  const api = { tokenize, highlightHtml, svgTspans, compactSource, isBlankLine, COLORS };
   global.L5XST = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);
