@@ -14,7 +14,10 @@
         <div><strong>L5X Ladder Studio</strong><small>Studio 5000 Logic Designer</small></div>
       </div>
       <div class="top-actions">
-        <span id="fileBadge" class="file-badge">파일을 열어 시작하세요</span>
+        <span class="file-meta">
+          <span id="fileBadge" class="file-badge">파일을 열어 시작하세요</span>
+          <button id="clearProjectBtn" type="button" class="file-clear" hidden title="이 브라우저에 저장된 파일을 지웁니다">닫기</button>
+        </span>
         <a class="button ghost" href="CHANGELOG.md">변경 이력</a>
         <button id="textImportBtn" class="button dark">RLL 텍스트 → LD</button>
         <label class="button primary" for="fileInput">L5X 열기</label>
@@ -55,7 +58,7 @@
           </div>
           <p class="eyebrow">ROCKWELL AUTOMATION L5X</p>
           <h1>로직을 읽는 순간,<br>래더가 됩니다.</h1>
-          <p>RLL은 래더 다이어그램으로, SFC는 Sequential Function Chart로 재구성합니다.<br>ST는 원문 그대로 보존합니다.</p>
+          <p>RLL은 래더 다이어그램으로, SFC는 Sequential Function Chart로 재구성합니다.<br>ST는 원문 그대로 보존합니다.<br>마지막으로 연 파일은 이 브라우저 안에만 남고, 서버로는 올라가지 않습니다.</p>
           <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
             <label class="button primary large" for="fileInput">L5X 파일 선택</label>
             <a class="button dark large" href="demo.html">샘플 래더</a>

@@ -6,6 +6,11 @@
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const SCALE_KEY = 'l5x-ld-scale-mode';
   const NAV_KEY = 'l5x-ld-nav-collapse';
+  const LAST_DB = 'l5x-ld-studio';
+  const LAST_STORE = 'kv';
+  const LAST_KEY = 'last-project';
+  const LAST_SS_KEY = 'l5x-ld-last-project';
+  const LAST_SS_MAX = 1800000;
   const NOTE_SHEET_MIN = 920;
   const state = {
     project: null, selected: null, tab: 'ladder', zoom: 1, showRaw: false, showRungMeta: true,
@@ -145,7 +150,8 @@
       filename, name: controller?.getAttribute('Name') || filename.replace(/\.l5x$/i, ''),
       software: doc.documentElement.getAttribute('SoftwareRevision') || '', programs, all,
       tags: $$('Controller > Tags > Tag, Program > Tags > Tag', doc).length,
-      rungCount: all.filter(r => r.type === 'RLL').reduce((n, r) => n + r.rungs.length, 0)
+      rungCount: all.filter(r => r.type === 'RLL').reduce((n, r) => n + r.rungs.length, 0),
+      xml: text, origin: 'file'
     };
   }
 
@@ -274,14 +280,116 @@
     const tail=source.slice(start).trim();if(tail)rungs.push(tail.endsWith(';')?tail:tail+';');
     return rungs.map(s=>s.replace(/^\s*(?:Rung\s+)?\d+\s*:\s*/i,''));
   }
-  function loadTextLogic(name,source){
+  function idbOpen(){
+    return new Promise((resolve,reject)=>{
+      if(!window.indexedDB){reject(new Error('IndexedDB 없음'));return;}
+      const req=indexedDB.open(LAST_DB,1);
+      req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains(LAST_STORE))req.result.createObjectStore(LAST_STORE);};
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error);
+    });
+  }
+  function idbOp(mode,fn){
+    return idbOpen().then(db=>new Promise((resolve,reject)=>{
+      const tx=db.transaction(LAST_STORE,mode);
+      tx.onerror=()=>reject(tx.error);
+      const req=fn(tx.objectStore(LAST_STORE));
+      if(!req){tx.oncomplete=()=>resolve();return;}
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error);
+    }));
+  }
+  function quotaError(e){return !!(e&&(e.name==='QuotaExceededError'||e.code===22||e.code===1014));}
+  function saveLastRecord(rec){
+    return idbOp('readwrite',store=>store.put(rec,LAST_KEY)).then(()=>{
+      try{sessionStorage.removeItem(LAST_SS_KEY);}catch(err){}
+    }).catch(e=>{
+      try{
+        const json=JSON.stringify(rec);
+        if(json.length>LAST_SS_MAX) throw e||new Error('too large');
+        sessionStorage.setItem(LAST_SS_KEY,json);
+      }catch(err){
+        if(quotaError(e)||quotaError(err)) toast('파일이 커서 이 브라우저에 남기지 못했습니다. 새로고침하면 다시 열어야 합니다.',true);
+        throw err;
+      }
+    });
+  }
+  function readLastRecord(){
+    return idbOp('readonly',store=>store.get(LAST_KEY)).then(v=>v||null).catch(()=>{
+      try{const raw=sessionStorage.getItem(LAST_SS_KEY);return raw?JSON.parse(raw):null;}catch(err){return null;}
+    });
+  }
+  function clearLastRecord(){
+    return idbOp('readwrite',store=>store.delete(LAST_KEY)).catch(()=>{}).finally(()=>{
+      try{sessionStorage.removeItem(LAST_SS_KEY);}catch(err){}
+    });
+  }
+  function snapshotLast(){
+    const p=state.project; if(!p||p.origin==='preload') return null;
+    const kind=p.origin==='text'?'text':'l5x';
+    const rec={kind,filename:p.filename,name:kind==='text'?(p.all[0]&&p.all[0].name):p.name,routineId:state.selected&&state.selected.id,savedAt:Date.now()};
+    if(kind==='text') rec.source=p.all[0]&&p.all[0].source;
+    else rec.xml=p.xml;
+    if(kind==='text'? !rec.source : !rec.xml) return null;
+    return rec;
+  }
+  let persistTimer;
+  function persistLast(immediate){
+    const rec=snapshotLast(); if(!rec) return;
+    const run=()=>saveLastRecord(rec).catch(()=>{});
+    if(immediate){clearTimeout(persistTimer);return run();}
+    clearTimeout(persistTimer); persistTimer=setTimeout(run,200);
+  }
+  function setFileBadge(text,canClear){
+    const badge=$('#fileBadge'); if(badge){badge.textContent=text;badge.title=canClear?'이 브라우저에만 저장됩니다. 서버로 전송되지 않습니다.':'';}
+    const btn=$('#clearProjectBtn'); if(btn) btn.hidden=!canClear;
+  }
+  function resetStudio(){
+    state.project=null; state.selected=null; state.rendered=[];
+    const welcome=$('#welcome'), viewer=$('#viewer'), summary=$('#projectSummary');
+    if(welcome) welcome.hidden=false; if(viewer) viewer.hidden=true; if(summary) summary.hidden=true;
+    setFileBadge('파일을 열어 시작하세요',false);
+    const search=$('#searchInput'); if(search){search.disabled=true;search.value='';}
+    const tree=$('#routineTree'); if(tree) tree.innerHTML='<div class="empty-side">L5X 내부의 Program과 Routine이 여기에 표시됩니다.</div>';
+    const input=$('#fileInput'); if(input) input.value='';
+    ['routineCount','rungCount','tagCount'].forEach(id=>{const el=$('#'+id); if(el) el.textContent='0';});
+  }
+  async function clearLoadedProject(){
+    await clearLastRecord();
+    resetStudio();
+    toast('브라우저에 저장해 둔 파일을 지웠습니다.');
+  }
+  async function restoreLastProject(){
+    const rec=await readLastRecord();
+    if(!rec) return false;
+    try{
+      if(rec.kind==='text'&&rec.source){
+        loadTextLogic(rec.name||'Text_Logic',rec.source,{persist:false,routineId:rec.routineId,silent:true});
+        return true;
+      }
+      if(rec.xml){
+        state.project=parseProject(rec.xml,rec.filename||'restore.l5x');
+        updateProjectUI({persist:false,routineId:rec.routineId});
+        return true;
+      }
+    }catch(e){
+      toast('저장해 둔 파일을 다시 열지 못했습니다.',true);
+      await clearLastRecord();
+    }
+    return false;
+  }
+
+  function loadTextLogic(name,source,opts){
+    opts=opts||{};
     name=(name||'Text_Logic').trim()||'Text_Logic';source=source.trim();if(!source)throw new Error('변환할 텍스트 로직을 입력하세요.');
     const type='RLL';
     const rungs=splitRLLText(source).map((text,i)=>({number:i,type:'N',text,comment:'붙여넣은 RLL 텍스트'}));
     if(!rungs.length)throw new Error('변환 가능한 로직 문장을 찾지 못했습니다.');
+    const origin=opts.origin||'text';
     const routine={id:'text-routine',name,type,program:'Text_Import',source,rungs,comments:[],origin:'text'};
-    state.project={filename:`${name}.${type.toLowerCase()}`,name:'Text Logic',software:'',programs:[{name:'Text_Import',routines:[routine]}],all:[routine],tags:0,rungCount:rungs.length};
-    updateProjectUI();toast(`${rungs.length}개 LD Rung으로 변환했습니다.`);
+    state.project={filename:`${name}.${type.toLowerCase()}`,name:'Text Logic',software:'',programs:[{name:'Text_Import',routines:[routine]}],all:[routine],tags:0,rungCount:rungs.length,origin};
+    updateProjectUI({persist:opts.persist!==false,routineId:opts.routineId});
+    if(!opts.silent) toast(`${rungs.length}개 LD Rung으로 변환했습니다.`);
   }
 
   function loadFile(file) {
@@ -289,14 +397,19 @@
     reader.onload=()=>{ try { state.project=parseProject(reader.result,file.name); updateProjectUI(); toast(`${file.name} 분석 완료`); } catch(e){ toast(e.message,true); } };
     reader.onerror=()=>toast('파일을 읽지 못했습니다.',true); reader.readAsText(file);
   }
-  function updateProjectUI(){
+  function updateProjectUI(opts){
+    opts=opts||{};
     const p=state.project, audit=auditProject(); $('#welcome').hidden=true; $('#viewer').hidden=false; $('#projectSummary').hidden=false;
     Object.entries(audit).forEach(([k,v])=>$('#viewer').dataset[k]=String(v));
-    $('#fileBadge').textContent=`${p.name} · ${p.filename}`; $('#routineCount').textContent=p.all.length; $('#rungCount').textContent=p.rungCount; $('#tagCount').textContent=p.tags; $('#searchInput').disabled=false;$('#searchInput').value='';
+    setFileBadge(`${p.name} · ${p.filename}`, p.origin!=='preload');
+    $('#routineCount').textContent=p.all.length; $('#rungCount').textContent=p.rungCount; $('#tagCount').textContent=p.tags; $('#searchInput').disabled=false;$('#searchInput').value='';
     seedNavOpen();
     const navEl=$('#navCollapse'); if(navEl) navEl.checked=state.navCollapse;
     renderTree();
-    const first=p.all.find(r=>r.type==='RLL')||p.all[0]; if(first) selectRoutine(first,{keepTree:true});
+    const want=opts.routineId&&p.all.find(r=>r.id===opts.routineId);
+    const first=want||p.all.find(r=>r.type==='RLL')||p.all[0];
+    if(first) selectRoutine(first,{keepTree:true,persist:false});
+    if(opts.persist!==false && p.origin!=='preload') persistLast(true);
   }
   function seedNavOpen(){
     if(!state.project){state.navOpen=new Set();return;}
@@ -356,6 +469,7 @@
   function selectRoutine(r,opts){
     if(!r)return;
     state.selected=r;
+    if(!opts||opts.persist!==false) persistLast();
     if(opts&&opts.keepTree) markActiveRoutine();
     else renderTree($('#searchInput')?$('#searchInput').value:'');
     $('#breadcrumb').textContent=`${state.project.name} / Programs / ${r.program}`;
@@ -474,7 +588,7 @@
     renderSFC:(...a)=>globalThis.L5XSFC&&L5XSFC.renderSFC(...a),
     chartToText:(...a)=>globalThis.L5XSFC&&L5XSFC.chartToText(...a),
     highlightST:(src)=>globalThis.L5XST&&L5XST.highlightHtml(src),
-    loadTextLogic,loadFile,selectRoutine,renderRoutine,
+    loadTextLogic,loadFile,selectRoutine,renderRoutine,clearLoadedProject,restoreLastProject,
     setTagValues(values){state.tagValues={...(values||{})};if(state.selected)renderRoutine();},
     diagnostics:auditProject,getState:()=>state
   };
@@ -498,17 +612,26 @@
     $('#textConvertBtn').onclick=()=>{try{loadTextLogic($('#textRoutineName').value,$('#textLogicInput').value);textDialog.close();}catch(e){toast(e.message,true);}};
     let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(state.selected&&!$('#viewer').hidden)renderRoutine();},180)});
     const dz=$('#dropZone');['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag')}));['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('drag')}));dz.addEventListener('drop',e=>e.dataTransfer.files[0]&&loadFile(e.dataTransfer.files[0]));
-    function tryPreload(){
+    const clearBtn=$('#clearProjectBtn');
+    if(clearBtn) clearBtn.addEventListener('click',()=>clearLoadedProject());
+    async function tryPreload(){
       if(window.LD_TAG_VALUES)state.tagValues={...window.LD_TAG_VALUES};
       if(window.LD_PRELOAD_L5X){
-        try{state.project=parseProject(window.LD_PRELOAD_L5X,window.LD_PRELOAD_NAME||'preload.l5x');updateProjectUI();}
+        try{
+          state.project=parseProject(window.LD_PRELOAD_L5X,window.LD_PRELOAD_NAME||'preload.l5x');
+          state.project.origin='preload';
+          updateProjectUI({persist:false});
+        }
         catch(e){toast(e.message||String(e),true);}
         return;
       }
       const p = window.LD_PRELOAD || window.SC1_LD_PRELOAD;
-      if(!p || !p.source) return;
-      try { loadTextLogic(p.name || 'Text_Logic', p.source); }
-      catch(e){ toast(e.message || String(e), true); }
+      if(p && p.source){
+        try { loadTextLogic(p.name || 'Text_Logic', p.source, {persist:false, origin:'preload'}); }
+        catch(e){ toast(e.message || String(e), true); }
+        return;
+      }
+      await restoreLastProject();
     }
     if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', tryPreload);
     else setTimeout(tryPreload, 0);
