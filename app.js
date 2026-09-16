@@ -543,9 +543,9 @@
     paintSource(r);
     setChartToolbar(r.type);
     renderRoutine();
-    if(r.type==='ST') setTab('source');
-    else if(state.tab==='source'||state.tab==='report') setTab(state.tab);
-    else setTab('ladder');
+    // A routine selection always opens in its native representation.  The
+    // Ladder panel is also the SFC canvas; setChartToolbar changes its label.
+    setTab(r.type === 'ST' ? 'source' : 'ladder');
   }
   function paintSource(r){
     const pre=$('#sourceCode');
