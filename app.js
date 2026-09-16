@@ -178,6 +178,7 @@
     if (!node || node.type === 'instruction') {
       const block = node && (timerOps.has(node.op) || compareOps.has(node.op) || (!contactOps.has(node.op) && !outputOps.has(node.op)));
       const longest = Math.max(node?.op.length || 3, ...(node?.args || []).map(a => a.length));
+      if (node?.op === 'JSR') return {w:Math.max(232,longest*7+110),h:108};
       return block
         ? {w:Math.max(178,longest*7+76),h:Math.max(84,52+(node?.args.length||0)*20)}
         : {w:Math.max(116,longest*7+44),h:72};
@@ -192,6 +193,14 @@
   function leafCount(node){if(node.type==='instruction')return 1;if(node.type==='sequence')return node.children.reduce((n,x)=>n+leafCount(x),0);return Math.max(0,...node.branches.map(leafCount));}
   const BRANCH_GAP = 88;
 
+  function wrapSequence(ast,maxWidth){
+    if(!ast||ast.type!=='sequence'||ast.children.length<2||maxWidth<=0)return [ast];
+    const rows=[],gap=18;let children=[],width=0;
+    ast.children.forEach(child=>{const cw=measure(child).w;if(children.length&&width+gap+cw>maxWidth){rows.push({type:'sequence',children});children=[];width=0;}children.push(child);width+=(children.length>1?gap:0)+cw;});
+    if(children.length)rows.push({type:'sequence',children});return rows.length>1?rows:[ast];
+  }
+  function continuationArrow(out,x1,x2,y){out.push(`<line class="wire continuation" x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" marker-end="url(#arrow-left)"/>`);}
+
   function renderRung(rung, index, viewportWidth = 900, showIndex = false) {
     const parser = new RLLParser(rung.text); const ast = parser.parse(); const m = measure(ast);
     // Number column used to reserve 72px on the left.  Captured SVGs keep the
@@ -201,19 +210,23 @@
     const nodePadL = 32;
     const nodePadR = 34;
     const contentW = m.w + railL + pad + nodePadL + nodePadR;
-    const W = Math.max(contentW, viewportWidth || 0);
-    const H = Math.max(118, m.h + 54), y = 42;
+    const sheetW = Math.max(viewportWidth || 0, showIndex ? 1040 : 0);
+    const sheetDrawW = sheetW - railL - pad - nodePadL - nodePadR;
+    const rows = wrapSequence(ast, sheetDrawW);
+    const W = rows.length > 1 ? sheetW : Math.max(contentW, sheetW);
     const railR = W - pad, nodeL = railL + nodePadL, nodeR = W - pad - nodePadR, drawW = nodeR - nodeL;
+    const rowHeights = rows.map(row => Math.max(118, measure(row).h + 54));
+    const H = rowHeights.reduce((n,h)=>n+h,0), y = 42;
     const indexText = showIndex ? `<text class="rung-index" x="18" y="${y+4}">${esc(rung.number)}</text>` : '';
     const parts = [`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Rung ${esc(rung.number)} ladder diagram">`, svgDefs(), `${indexText}<line class="rail" x1="${railL}" y1="0" x2="${railL}" y2="${H}"/><line class="rail" x1="${railR}" y1="0" x2="${railR}" y2="${H}"/>`];
-    parts.push(`<line class="wire" x1="${railL}" y1="${y}" x2="${nodeL}" y2="${y}"/>`);
-    renderRoot(ast,nodeL,y,drawW,parts);
-    parts.push(`<line class="wire" x1="${nodeR}" y1="${y}" x2="${railR}" y2="${y}"/>`, '</svg>');
+    let top = 0;
+    rows.forEach((row,i)=>{const cy=top+y;parts.push(`<line class="wire" x1="${railL}" y1="${cy}" x2="${nodeL}" y2="${cy}"/>`);renderRoot(row,nodeL,cy,drawW,parts);parts.push(`<line class="wire" x1="${nodeR}" y1="${cy}" x2="${railR}" y2="${cy}"/>`);if(i<rows.length-1){const turnY=top+rowHeights[i]-18;parts.push(`<line class="wire" x1="${railR}" y1="${cy}" x2="${railR}" y2="${turnY}"/>`);continuationArrow(parts,railR-4,railL+4,turnY);parts.push(`<line class="wire" x1="${railL}" y1="${turnY}" x2="${railL}" y2="${top+rowHeights[i]+y}"/>`);}top+=rowHeights[i];});
+    parts.push('</svg>');
     const warnings = [...parser.warnings];
     return { svg: parts.join(''), ast, warnings, rung, index, width:W };
   }
 
-  function svgDefs() { return `<style>.wire,.rail,.device{fill:none;stroke:#243b7a;stroke-width:1.45;vector-effect:non-scaling-stroke}.wire.active,.device.active{stroke:#15b84e;stroke-width:4}.rail{stroke:#243b7a;stroke-width:1.7}.junction{fill:#243b7a}.rung-index{font:14px Georgia,'Times New Roman',serif;fill:#243b7a}.label{font:13px Arial,'Segoe UI',sans-serif;fill:#111;text-anchor:middle}.op{font:700 10px Arial,'Segoe UI',sans-serif;fill:#243b7a;text-anchor:middle}.mnemonic{fill:#243b7a}.arg-label{font:11px Arial,'Segoe UI',sans-serif;fill:#243b7a}.arg-value{font:12px Arial,'Segoe UI',sans-serif;fill:#111;text-anchor:end}.block{fill:#fff;stroke:#243b7a;stroke-width:1.25}.divider{stroke:#243b7a;stroke-width:1}.unknown{fill:#fff8e8;stroke:#9a6b18}</style>`; }
+  function svgDefs() { return `<defs><marker id="arrow-left" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M 8 0 L 0 4 L 8 8" fill="none" stroke="#243b7a" stroke-width="1.2"/></marker></defs><style>.wire,.rail,.device{fill:none;stroke:#243b7a;stroke-width:1.45;vector-effect:non-scaling-stroke}.wire.active,.device.active{stroke:#15b84e;stroke-width:4}.rail{stroke:#243b7a;stroke-width:1.7}.junction{fill:#243b7a}.rung-index{font:14px Georgia,'Times New Roman',serif;fill:#243b7a}.label{font:13px Arial,'Segoe UI',sans-serif;fill:#111;text-anchor:middle}.op{font:700 10px Arial,'Segoe UI',sans-serif;fill:#243b7a;text-anchor:middle}.jsr-description{font:11px Arial,'Segoe UI',sans-serif;fill:#243b7a;text-anchor:middle}.jsr-block{stroke-width:1.45}.mnemonic{fill:#243b7a}.arg-label{font:11px Arial,'Segoe UI',sans-serif;fill:#243b7a}.arg-value{font:12px Arial,'Segoe UI',sans-serif;fill:#111;text-anchor:end}.block{fill:#fff;stroke:#243b7a;stroke-width:1.25}.divider{stroke:#243b7a;stroke-width:1}.unknown{fill:#fff8e8;stroke:#9a6b18}</style>`; }
   function isActionNode(node){
     if(node.type==='instruction')return outputOps.has(node.op)||timerOps.has(node.op)||['ADD','SUB','MUL','DIV','ABS','CPT','CLR','SWPB','OR','PID','MSG'].includes(node.op);
     if(node.type==='sequence')return node.children.length>0&&isActionNode(node.children.at(-1));
@@ -269,6 +282,14 @@
     }
     if (['ONS','OSR','OSF'].includes(n.op)) {
       out.push(`<text class="label" x="${cx}" y="${cy-24}">${esc(label)}</text><rect class="block" x="${cx-23}" y="${cy-15}" width="46" height="30"/><text class="op" x="${cx}" y="${cy+3}">${n.op}</text><line class="wire" x1="${wireL}" y1="${cy}" x2="${cx-23}" y2="${cy}"/><line class="wire" x1="${cx+23}" y1="${cy}" x2="${wireR}" y2="${cy}"/>`); return;
+    }
+    if (n.op === 'JSR') {
+      const fields=[['Routine Name',n.args[0]||'?'],['Input Par',n.args[1]||''],['Return Par',n.args[2]||'']];
+      const desired=Math.max(232,...fields.map(([k,v])=>Math.max(k.length*7+18,String(v).length*7+18)+34));
+      const bw=Math.min(width-18,desired),bh=108,bx=cx-bw/2,by=cy-bh/2;
+      out.push(`<title>JSR · Jump To Subroutine · ${esc(n.raw)}</title><rect class="block jsr-block" x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="1"/><text class="op mnemonic" x="${cx}" y="${by+13}">JSR</text><text class="jsr-description" x="${cx}" y="${by+29}">Jump To Subroutine</text><line class="divider" x1="${bx}" y1="${by+36}" x2="${bx+bw}" y2="${by+36}"/>`);
+      fields.forEach(([k,v],i)=>{const yy=by+55+i*17;out.push(`<text class="arg-label" x="${bx+8}" y="${yy}">${esc(k)}</text><text class="arg-value" x="${bx+bw-8}" y="${yy}">${esc(String(v))}</text>`);});
+      out.push(`<line class="wire" x1="${wireL}" y1="${cy}" x2="${bx}" y2="${cy}"/><line class="wire" x1="${bx+bw}" y1="${cy}" x2="${wireR}" y2="${cy}"/>`); return;
     }
     const m=measure(n), bh=Math.min(m.h-8,Math.max(54,30+n.args.length*21)), bw=Math.min(width-18,Math.max(138,m.w-20)), bx=cx-bw/2, by=cy-bh/2;
     const known=contactOps.has(n.op)||compareOps.has(n.op)||timerOps.has(n.op)||outputOps.has(n.op)||instructionNames[n.op];
@@ -624,6 +645,7 @@
     $('#textDialogClose').onclick=()=>textDialog.close();
     $('#textConvertBtn').onclick=()=>{try{loadTextLogic($('#textRoutineName').value,$('#textLogicInput').value);textDialog.close();}catch(e){toast(e.message,true);}};
     let resizeTimer;window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(state.selected&&!$('#viewer').hidden)renderRoutine();},180)});
+    if(window.ResizeObserver){const canvas=$('#ladderCanvas');let observedWidth=0;const ro=new ResizeObserver(entries=>{const w=Math.round(entries[0]?.contentRect?.width||0);if(!w||w===observedWidth)return;observedWidth=w;clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(state.selected&&!$('#viewer').hidden&&state.scaleMode==='fit')renderRoutine();},80);});if(canvas)ro.observe(canvas);}
     const dz=$('#dropZone');['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag')}));['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('drag')}));dz.addEventListener('drop',e=>e.dataTransfer.files[0]&&loadFile(e.dataTransfer.files[0]));
     const clearBtn=$('#clearProjectBtn');
     if(clearBtn) clearBtn.addEventListener('click',()=>clearLoadedProject());
