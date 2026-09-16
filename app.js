@@ -361,14 +361,27 @@
     $('#routineTitle').textContent=r.name;
     $('#typeBadge').textContent=r.type;
     $('#routineMeta').textContent=metaText(r);
-    $('#sourceCode').textContent=r.source||'표시할 원본 로직이 없습니다.';
+    paintSource(r);
     setChartToolbar(r.type);
     renderRoutine();
     if(r.type==='ST') setTab('source');
     else if(state.tab==='source'||state.tab==='report') setTab(state.tab);
     else setTab('ladder');
   }
-  function metaText(r){if(r.type==='RLL')return `${r.rungs.length} Rungs · ${r.origin==='text'?'텍스트 RLL 변환':'원본 RLL'}`;if(r.type==='ST')return 'Structured Text 원문 보존';if(r.type==='SFC'){const c=r.sfc;return c?`SFC · 스텝 ${c.steps.length} · 트랜지션 ${c.transitions.length}`:'Sequential Function Chart';}return `${r.type} 루틴 · 원본 구조 보존`;}
+  function paintSource(r){
+    const pre=$('#sourceCode');
+    const view=$('#stView');
+    if(r.type==='ST'&&globalThis.L5XST&&typeof L5XST.highlightHtml==='function'){
+      if(pre)pre.hidden=true;
+      if(view){view.hidden=false;view.innerHTML=L5XST.highlightHtml(r.source||'');}
+      const panel=$('#sourcePanel'); if(panel)panel.classList.add('st-mode');
+      return;
+    }
+    if(view){view.hidden=true;view.innerHTML='';}
+    if(pre){pre.hidden=false;pre.textContent=r.source||'표시할 원본 로직이 없습니다.';}
+    const panel=$('#sourcePanel'); if(panel)panel.classList.remove('st-mode');
+  }
+  function metaText(r){if(r.type==='RLL')return `${r.rungs.length} Rungs · ${r.origin==='text'?'텍스트 RLL 변환':'원본 RLL'}`;if(r.type==='ST')return 'Structured Text · 1756-PM007';if(r.type==='SFC'){const c=r.sfc;return c?`SFC · 스텝 ${c.steps.length} · 트랜지션 ${c.transitions.length}`:'Sequential Function Chart';}return `${r.type} 루틴 · 원본 구조 보존`;}
   function renderSfcSheet(r){
     const canvas=$('#ladderCanvas');
     if(!globalThis.L5XSFC||typeof L5XSFC.renderSFC!=='function'){
@@ -459,6 +472,7 @@
     parseSFCFromXml:(...a)=>globalThis.L5XSFC&&L5XSFC.parseSFCFromXml(...a),
     renderSFC:(...a)=>globalThis.L5XSFC&&L5XSFC.renderSFC(...a),
     chartToText:(...a)=>globalThis.L5XSFC&&L5XSFC.chartToText(...a),
+    highlightST:(src)=>globalThis.L5XST&&L5XST.highlightHtml(src),
     loadTextLogic,loadFile,selectRoutine,renderRoutine,
     setTagValues(values){state.tagValues={...(values||{})};if(state.selected)renderRoutine();},
     diagnostics:auditProject,getState:()=>state

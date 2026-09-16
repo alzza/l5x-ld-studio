@@ -41,14 +41,15 @@ XIC(Start_PB)XIO(Stop_PB)OTE(Motor_Run);
 ## 지원
 
 - RLL: 직렬 명령, 중첩 병렬 분기, XIC/XIO, OTE/OTL/OTU, ONS/OSR/OSF, 타이머·카운터·비교·이동·호출 계열
-- SFC: L5X 좌표로 Sequential Function Chart를 그림. ST는 원문 보존
+- SFC: L5X 좌표로 Sequential Function Chart를 그림
+- ST: 1756-PM007 구문을 VS Code Dark+ 색으로 강조
 - 내보내기: SVG, TXT, 브라우저 인쇄/PDF
 - 레이아웃: Rockwell 매뉴얼 기준의 수평 주선·하향 Branch·연속 전원 레일
 - 태그 표시: 원문 전체를 보존하며 임의 생략하지 않음
 
 ## 정확도
 
-래더 변환 대상은 RLL 루틴과 직접 입력한 RLL Neutral Text입니다. SFC는 LD로 바꾸지 않고 매뉴얼 기호로 차트를 그립니다. ST는 원문을 보존합니다.
+래더 변환 대상은 RLL 루틴과 직접 입력한 RLL Neutral Text입니다. SFC는 LD로 바꾸지 않고 매뉴얼 기호로 차트를 그립니다. ST는 원문을 보존하고 구문만 색으로 구분합니다.
 
 ## 로컬 파일
 
@@ -58,6 +59,7 @@ XIC(Start_PB)XIO(Stop_PB)OTE(Motor_Run);
 | `demo.html` | 범용 모터 스타터 샘플 자동 로드 |
 | `app.js` / `app.css` | 스튜디오 셸·RLL 렌더러 |
 | `sfc.js` | SFC 파서·차트 렌더러 |
+| `st.js` | Structured Text 구문 강조 |
 | `sample.rll` | 샘플 Neutral Text |
 | `sample-sfc.xml` | 샘플 SFC (공장 파일 아님) |
 

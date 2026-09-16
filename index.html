@@ -105,7 +105,10 @@
             </div>
             <div id="ladderCanvas" class="ladder-canvas"></div>
           </div>
-          <div id="sourcePanel" class="tab-panel source-panel" hidden><pre id="sourceCode"></pre></div>
+          <div id="sourcePanel" class="tab-panel source-panel" hidden>
+            <pre id="sourceCode"></pre>
+            <div id="stView" class="st-view" hidden></div>
+          </div>
           <div id="reportPanel" class="tab-panel report-panel" hidden></div>
         </section>
       </main>
@@ -132,6 +135,7 @@
     </form>
   </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="st.js"></script>
   <script src="sfc.js"></script>
   <script src="app.js"></script>
 </body>
