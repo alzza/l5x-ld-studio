@@ -199,7 +199,8 @@
     ast.children.forEach(child=>{const cw=measure(child).w;if(children.length&&width+gap+cw>maxWidth){rows.push({type:'sequence',children});children=[];width=0;}children.push(child);width+=(children.length>1?gap:0)+cw;});
     if(children.length)rows.push({type:'sequence',children});return rows.length>1?rows:[ast];
   }
-  function continuationArrow(out,x1,x2,y){out.push(`<line class="wire continuation" x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" marker-end="url(#arrow-left)"/>`);}
+  function continuationArrow(out,x1,x2,y){out.push(`<line class="wire continuation" x1="${x1}" y1="${y}" x2="${x2}" y2="${y}"/>`);for(let x=x1-12;x>x2+8;x-=24)out.push(`<path class="wire continuation-mark" d="M ${x+5} ${y-4} L ${x} ${y} L ${x+5} ${y+4}"/>`);}
+  function continuationDown(out,x,y1,y2){for(let y=y1+16;y<y2-4;y+=24)out.push(`<path class="wire continuation-mark" d="M ${x-4} ${y-5} L ${x} ${y} L ${x+4} ${y-5}"/>`);}
 
   function renderRung(rung, index, viewportWidth = 900, showIndex = false) {
     const parser = new RLLParser(rung.text); const ast = parser.parse(); const m = measure(ast);
@@ -220,7 +221,7 @@
     const indexText = showIndex ? `<text class="rung-index" x="18" y="${y+4}">${esc(rung.number)}</text>` : '';
     const parts = [`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Rung ${esc(rung.number)} ladder diagram">`, svgDefs(), `${indexText}<line class="rail" x1="${railL}" y1="0" x2="${railL}" y2="${H}"/><line class="rail" x1="${railR}" y1="0" x2="${railR}" y2="${H}"/>`];
     let top = 0;
-    rows.forEach((row,i)=>{const cy=top+y;parts.push(`<line class="wire" x1="${railL}" y1="${cy}" x2="${nodeL}" y2="${cy}"/>`);renderRoot(row,nodeL,cy,drawW,parts);parts.push(`<line class="wire" x1="${nodeR}" y1="${cy}" x2="${railR}" y2="${cy}"/>`);if(i<rows.length-1){const turnY=top+rowHeights[i]-18;parts.push(`<line class="wire" x1="${railR}" y1="${cy}" x2="${railR}" y2="${turnY}"/>`);continuationArrow(parts,railR-4,railL+4,turnY);parts.push(`<line class="wire" x1="${railL}" y1="${turnY}" x2="${railL}" y2="${top+rowHeights[i]+y}"/>`);}top+=rowHeights[i];});
+    rows.forEach((row,i)=>{const cy=top+y;parts.push(`<line class="wire" x1="${railL}" y1="${cy}" x2="${nodeL}" y2="${cy}"/>`);renderRoot(row,nodeL,cy,drawW,parts);parts.push(`<line class="wire" x1="${nodeR}" y1="${cy}" x2="${railR}" y2="${cy}"/>`);if(i<rows.length-1){const turnY=top+rowHeights[i]-18;parts.push(`<line class="wire" x1="${railR}" y1="${cy}" x2="${railR}" y2="${turnY}"/>`);continuationDown(parts,railR,cy,turnY);continuationArrow(parts,railR-4,railL+4,turnY);parts.push(`<line class="wire" x1="${railL}" y1="${turnY}" x2="${railL}" y2="${top+rowHeights[i]+y}"/>`);}top+=rowHeights[i];});
     parts.push('</svg>');
     const warnings = [...parser.warnings];
     return { svg: parts.join(''), ast, warnings, rung, index, width:W };
