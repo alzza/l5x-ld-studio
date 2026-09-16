@@ -314,26 +314,46 @@
     const s = String(text || '').replace(/\s+/g, ' ').trim();
     if (!s) return [];
     const cw = charW || 6.6;
-    const limit = Math.max(24, maxW);
+    const limit = Math.max(48, maxW);
     if (s.length * cw <= limit) return [s];
+    const maxChars = Math.max(6, Math.floor(limit / cw));
+    function splitIdent(tok) {
+      const out = [];
+      let rest = tok;
+      while (rest.length > maxChars) {
+        const window = rest.slice(0, maxChars);
+        let cut = -1;
+        for (let i = window.length - 1; i >= Math.floor(maxChars * 0.35); i--) {
+          if (window[i] === '_' || window[i] === '.' || window[i] === '-') { cut = i + 1; break; }
+        }
+        if (cut < 1) cut = maxChars;
+        out.push(rest.slice(0, cut));
+        rest = rest.slice(cut);
+      }
+      if (rest) out.push(rest);
+      return out;
+    }
     const tokens = s.split(/(\s+|;|:=|\(|\)|,)/).filter(t => t !== '');
     const lines = [];
     let cur = '';
-    function fits(t) { return t.length * cw <= limit; }
+    function pushCur() {
+      const t = cur.replace(/\s+$/, '');
+      if (t) lines.push(t);
+      cur = '';
+    }
     tokens.forEach(tok => {
-      if (fits(cur + tok)) cur += tok;
+      if ((cur + tok).length * cw <= limit) { cur += tok; return; }
+      if (/^\s+$/.test(tok)) { pushCur(); return; }
+      pushCur();
+      const piece = tok.replace(/^\s+/, '');
+      if (piece.length * cw <= limit) cur = piece;
       else {
-        if (cur.trim()) lines.push(cur.replace(/\s+$/, ''));
-        let rest = tok.replace(/^\s+/, '');
-        while (!fits(rest) && rest.length > 1) {
-          const n = Math.max(1, Math.floor(limit / cw));
-          lines.push(rest.slice(0, n));
-          rest = rest.slice(n);
-        }
-        cur = rest;
+        const parts = splitIdent(piece);
+        parts.slice(0, -1).forEach(p => lines.push(p));
+        cur = parts[parts.length - 1] || '';
       }
     });
-    if (cur.trim()) lines.push(cur.replace(/\s+$/, ''));
+    pushCur();
     return lines.length ? lines : [s];
   }
 
@@ -385,33 +405,6 @@
       boxes[step.id] = box;
       stepList.push(box);
     });
-
-    stepList.forEach(box => {
-      const others = stepList.filter(o => o !== box && o.x > box.x + 4);
-      const band = others.filter(o => o.y < box.y + box.h + 48 && o.y + o.h > box.y - 12);
-      const nextX = band.length ? Math.min(...band.map(o => o.x)) : Infinity;
-      const gap = Number.isFinite(nextX) ? nextX - (box.x + box.w) - 20 : 280;
-      if (gap > 0 && box.w > STEP_W && box.x + box.w > nextX - 8) {
-        const cap = Math.max(STEP_W, nextX - box.x - 12);
-        if (cap < box.w) {
-          const lines = wrapToWidth(box.node.operand || '', cap - 22, 7.1);
-          box.w = cap;
-          box.h = Math.max(STEP_H, 20 + lines.length * 16);
-          box.nameLines = lines;
-          box.cx = box.x + box.w / 2;
-          box.cy = box.y + box.h / 2;
-        }
-      }
-      const remain = Number.isFinite(nextX) ? nextX - (box.x + box.w) - 24 : 280;
-      const actMax = Math.max(72, Math.min(360, remain));
-      const show = box.node.showActions;
-      box.actX = box.x + box.w + 16;
-      box.actY = box.y;
-      box.acts = box.node.actions.map(a => ({ action: a, m: measureAction(a, show, actMax) }));
-      box.actW = box.acts.reduce((n, a) => Math.max(n, a.m.w), 0);
-      box.actH = box.acts.reduce((n, a) => n + a.m.h + 4, 0);
-    });
-
     chart.transitions.forEach(tr => {
       const x = sx(tr.x);
       const y = sx(tr.y);
@@ -444,11 +437,63 @@
       boxes[tb.id] = { node: tb, x, y, w, h, cx: x + w / 2, cy: y + h / 2, lines };
     });
 
+    function spansY(o, y0, y1) {
+      return o.y + (o.h || 20) > y0 && o.y < y1;
+    }
+    function nearestRightX(x, y0, y1, skipId) {
+      let best = Infinity;
+      Object.keys(boxes).forEach(id => {
+        const o = boxes[id];
+        if (!o || !o.node || o.node.id === skipId) return;
+        const kind = o.node.kind;
+        if (kind === 'leg' || kind === 'branch' || kind === 'transition') return;
+        if (!spansY(o, y0, y1)) return;
+        if (o.x > x + 4) best = Math.min(best, o.x);
+      });
+      return best;
+    }
+
+    stepList.forEach(box => {
+      const nextX = nearestRightX(box.x + box.w - 8, box.y - 12, box.y + box.h + 48, box.node.id);
+      if (Number.isFinite(nextX) && box.w > STEP_W && box.x + box.w > nextX - 8) {
+        const cap = Math.max(STEP_W, nextX - box.x - 12);
+        if (cap < box.w) {
+          const lines = wrapToWidth(box.node.operand || '', cap - 22, 7.1);
+          box.w = cap;
+          box.h = Math.max(STEP_H, 20 + lines.length * 16);
+          box.nameLines = lines;
+          box.cx = box.x + box.w / 2;
+          box.cy = box.y + box.h / 2;
+        }
+      }
+    });
+
+    stepList.forEach(box => {
+      const show = box.node.showActions;
+      box.actX = box.x + box.w + 16;
+      box.actY = box.y;
+      let actMax = 280;
+      for (let i = 0; i < 4; i++) {
+        const trial = box.node.actions.map(a => measureAction(a, show, actMax));
+        const trialH = Math.max(box.h, trial.reduce((n, m) => n + m.h + 4, 0));
+        const y0 = box.y - 8;
+        const y1 = box.y + trialH + 12;
+        const obstacleX = nearestRightX(box.actX - 2, y0, y1, box.node.id);
+        const gap = Number.isFinite(obstacleX) ? obstacleX - box.actX - 16 : 360;
+        const cap = Math.max(96, Math.min(360, gap, actMax));
+        box.acts = box.node.actions.map(a => ({ action: a, m: measureAction(a, show, cap) }));
+        if (Math.abs(cap - actMax) < 2) { actMax = cap; break; }
+        actMax = cap;
+      }
+      box.actW = box.acts.reduce((n, a) => Math.max(n, a.m.w), 0);
+      box.actH = box.acts.reduce((n, a) => n + a.m.h + 4, 0);
+    });
+
     function occupy() {
       const rects = [];
       Object.keys(boxes).forEach(id => {
         const b = boxes[id];
-        if (!b || !b.node || b.node.kind === 'leg' || b.node.kind === 'branch' || b.node.kind === 'transition') return;
+        if (!b || !b.node || b.node.kind === 'leg' || b.node.kind === 'branch') return;
         rects.push({ x: b.x, y: b.y, w: b.w, h: b.h, id: b.node.id });
         if (b.acts && b.acts.length && b.actW) {
           rects.push({ x: b.actX, y: b.actY, w: b.actW, h: Math.max(b.actH, b.h), id: b.node.id });
@@ -479,26 +524,45 @@
       }
       let placed = null;
       const sides = ['right', 'left'];
-      const widths = [220, 170, 130, 96];
-      const yOffs = [-2, 18, 28];
-      outer: for (let yi = 0; yi < yOffs.length; yi++) {
-        for (let si = 0; si < sides.length; si++) {
-          for (let wi = 0; wi < widths.length; wi++) {
+      const widths = [240, 190, 150, 110];
+      const yOffs = [-36, -18, -2, 16, 32, 48, 64];
+      outer: for (let si = 0; si < sides.length; si++) {
+        for (let wi = 0; wi < widths.length; wi++) {
+          for (let yi = 0; yi < yOffs.length; yi++) {
             const p = attempt(sides[si], widths[wi], yOffs[yi]);
             if (!p.hit) { placed = p; break outer; }
-            placed = p;
           }
         }
       }
-      if (!placed || placed.hit) {
-        const condLines = wrapToWidth(rawCond, 160, 6.6);
+      if (!placed) {
+        scan: for (let si = 0; si < sides.length; si++) {
+          for (let yOff = -90; yOff <= 220; yOff += 6) {
+            const p = attempt(sides[si], 180, yOff);
+            if (!p.hit) { placed = p; break scan; }
+          }
+        }
+      }
+      if (!placed) {
+        const condLines = wrapToWidth(rawCond, 180, 6.6);
         const textW = Math.max(name.length * 6.2, ...condLines.map(l => l.length * 6.6), 36);
-        const lx = cx + 22;
-        const blockers = rects.filter(o => o.id !== box.node.id && o.x < lx + textW && o.x + o.w > lx);
-        const topBlock = blockers.filter(o => o.y >= y).sort((a, b) => a.y - b.y)[0];
-        const ly = topBlock ? Math.max(y - 4 - (12 + (name ? 12 : 0) + condLines.length * 13), y - 48) : y + 22;
-        const r = { x: lx, y: ly, w: textW + 6, h: 16 + condLines.length * 13, id: box.node.id };
-        placed = { hit: false, side: 'right', lx, ly, name, condLines, r };
+        const textH = 12 + (name ? 12 : 0) + condLines.length * 13;
+        const nearby = rects.filter(o => o.id !== box.node.id && o.x < cx + 280 && o.x + o.w > cx - 80);
+        const localRight = nearby.reduce((m, o) => Math.max(m, o.x + o.w), cx + 22);
+        const xs = [cx + 22, cx - 22 - textW, localRight + 10, cx + 80];
+        hunt: for (let ly = y - 80; ly <= y + 280; ly += 8) {
+          for (let xi = 0; xi < xs.length; xi++) {
+            const lx = xs[xi];
+            const r = { x: lx, y: ly, w: textW + 6, h: textH + 4, id: box.node.id };
+            if (!rects.some(o => o.id !== box.node.id && overlap(r, o, 2))) {
+              placed = { hit: false, side: lx < cx ? 'left' : 'right', lx, ly, name, condLines, r };
+              break hunt;
+            }
+          }
+        }
+        if (!placed) {
+          const r = { x: localRight + 10, y: y + 28, w: textW + 6, h: textH + 4, id: box.node.id };
+          placed = { hit: false, side: 'right', lx: r.x, ly: r.y, name, condLines, r };
+        }
       }
       box.label = placed;
     });
@@ -748,7 +812,24 @@
     const inner = `<g transform="translate(${ox} ${oy})">${parts.join('')}</g>`;
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="Sequential function chart">` +
       `<rect width="100%" height="100%" fill="${PAPER}"/>${svgDefs()}${inner}</svg>`;
-    return { svg, width, height, warnings, kind: 'sfc', chart, boxes };
+    const paint = [];
+    Object.keys(boxes).forEach(id => {
+      const b = boxes[id];
+      if (!b || !b.node || b.node.kind === 'leg' || b.node.kind === 'branch') return;
+      if (b.node.kind === 'step') {
+        paint.push({ x: b.x, y: b.y, w: b.w, h: b.h, id: 'step-' + b.node.id });
+        if (b.actW) paint.push({ x: b.actX, y: b.actY, w: b.actW, h: Math.max(b.actH, 1), id: 'act-' + b.node.id });
+      } else if (b.node.kind === 'transition' && b.label && b.label.r) {
+        paint.push({ x: b.label.r.x, y: b.label.r.y, w: b.label.r.w, h: b.label.r.h, id: 'lab-' + b.node.id });
+      }
+    });
+    let overlapCount = 0;
+    for (let i = 0; i < paint.length; i++) {
+      for (let j = i + 1; j < paint.length; j++) {
+        if (overlap(paint[i], paint[j], 0)) overlapCount++;
+      }
+    }
+    return { svg, width, height, warnings, kind: 'sfc', chart, boxes, overlap: overlapCount > 0, overlapCount };
   }
 
   function chartToText(chart) {
@@ -771,7 +852,7 @@
     return lines.join('\n');
   }
 
-  const api = { parseSFC, parseSFCFromXml, renderSFC, chartToText, qualifierAbbrev };
+  const api = { parseSFC, parseSFCFromXml, renderSFC, chartToText, qualifierAbbrev, wrapToWidth };
   global.L5XSFC = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);
