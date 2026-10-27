@@ -1,5 +1,13 @@
 # 변경 이력
 
+## 2026-10-27 — 긴 태그 이름 겹침 수정
+
+- 접점·코일·ONS의 긴 태그를 20자 기준으로 줄바꿈하며 전체 이름을 표시한다. `_`와 `.`에서 먼저 줄을 나누고 위에서 아래로 읽도록 배치한다.
+- 글자의 실제 폭과 줄 수를 접점 간격·분기 높이 계산에 반영해 이웃 태그와 겹치거나 위쪽이 잘리지 않도록 했다.
+- 한 줄보다 넓은 병렬 분기는 필요한 폭을 유지한다. 화면에 맞출 때 접점 간격만 압축되지 않도록 했다.
+- Studio와 노트가 같은 렌더러를 사용한다. 390~1600px의 다섯 폭에서 긴 태그·중첩 분기 등 20개 조합의 겹침, 잘림, 문자열 보존을 브라우저에서 확인했다.
+- 표시 기준: [Rockwell Ladder Editor Display 설정의 Operand Formatting](https://www.rockwellautomation.com/en-us/docs/studio-5000-logix-designer/38-03/contents-ditamap/studio-5000-logix-designer/ladder-editor/components-of-the-ladder-editor-routine-window/change-ladder-editor-preferences/change-ladder-editor-or-ladder-listing-display-pre.html).
+
 ## 2026-09-16 — SFC 액션·트랜지션 겹침
 
 - 액션 상자는 오른쪽 트랜지션·스텝 앞까지만 넓힌다. 기호 좌표는 L5X X/Y를 유지한다.

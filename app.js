@@ -174,8 +174,36 @@
 
   /* Logix Designer uses a fixed horizontal signal path.  Parallel paths keep
      the first branch on that path and add the remaining branches underneath. */
+  // Operand Formatting = Wrap (20 characters, the Logix default). Keep every
+  // character and prefer identifier boundaries; the first line stays on top.
+  const operandCache = new Map();
+  const operandContext = document.createElement('canvas').getContext('2d');
+  function operandLayout(value) {
+    const text = String(value || '');
+    if (operandCache.has(text)) return operandCache.get(text);
+    const lines = []; let rest = text;
+    while (rest.length > 20) {
+      const chunk = rest.slice(0, 20);
+      const boundary = Math.max(chunk.lastIndexOf('_'), chunk.lastIndexOf('.')) + 1;
+      const end = boundary >= 8 ? boundary : 20;
+      lines.push(rest.slice(0, end)); rest = rest.slice(end);
+    }
+    lines.push(rest);
+    if (operandContext) operandContext.font = '13px Arial';
+    const width = Math.max(...lines.map(line => operandContext ? operandContext.measureText(line).width : line.length * 9));
+    const layout = {lines, width}; operandCache.set(text, layout); return layout;
+  }
+  function operandLabel(value, cx, baseline) {
+    const {lines} = operandLayout(value);
+    return `<text class="label operand-label" x="${cx}" y="${baseline}">${lines.map((line,i)=>`<tspan x="${cx}" y="${baseline-(lines.length-1-i)*15}">${esc(line)}</tspan>`).join('')}</text>`;
+  }
   function measure(node) {
     if (!node || node.type === 'instruction') {
+      if (node && (contactOps.has(node.op) || ['OTE','OTL','OTU'].includes(node.op))) {
+        const label = operandLayout(node.args[0]);
+        const top = -Math.max(36, (contactOps.has(node.op) && !['XIC','XIO'].includes(node.op) ? 24 : 17) + (label.lines.length-1)*15 + 16);
+        return {w:Math.max(116,label.width+32),h:36-top,top,bottom:36};
+      }
       const block = node && (timerOps.has(node.op) || compareOps.has(node.op) || (!contactOps.has(node.op) && !outputOps.has(node.op)));
       const longest = Math.max(node?.op.length || 3, ...(node?.args || []).map(a => a.length));
       const h = node?.op === 'JSR' ? 108
@@ -234,7 +262,12 @@
     const sheetDrawW = sheetW - railL - pad - nodePadL - nodePadR;
     const foldInset = Math.min(108, Math.max(76, Math.floor(sheetDrawW * 0.12)));
     const rows = wrapSequence(ast, Math.max(240, sheetDrawW - foldInset * 2));
-    const W = rows.length > 1 ? sheetW : Math.max(contentW, sheetW);
+    // A parallel subtree may be wider than one wrapped row. Never squeeze its
+    // instruction cells: the operand text does not shrink with that allocation.
+    const rowNaturalW = Math.max(...rows.map(row => measure(row).w + (isActionNode(row) ? 72 : 0)));
+    const W = Math.max(sheetW, rows.length > 1
+      ? rowNaturalW + railL + pad + Math.max(nodePadL,foldInset) + Math.max(nodePadR,foldInset)
+      : contentW + (isActionNode(ast) ? 72 : 0));
     const railR = W - pad, nodeL = railL + nodePadL, nodeR = W - pad - nodePadR, drawW = nodeR - nodeL;
     const rowMeasures = rows.map(measure);
     const rowHeights = rowMeasures.map(m => Math.max(142, m.h + 64));
@@ -294,16 +327,16 @@
     const cx=x+width/2, label=String(n.args[0] || ''), wireL=x+8, wireR=x+width-8, active=instructionActive(n), live=active?' active':'';
     out.push(`<line class="wire${live}" x1="${x}" y1="${cy}" x2="${wireL}" y2="${cy}"/><line class="wire${live}" x1="${wireR}" y1="${cy}" x2="${x+width}" y2="${cy}"/>`);
     if (n.op==='XIC'||n.op==='XIO') {
-      out.push(`<title>${esc(n.raw)}</title><text class="label" x="${cx}" y="${cy-17}">${esc(label)}</text><line class="device${live}" x1="${cx-10}" y1="${cy-12}" x2="${cx-10}" y2="${cy+12}"/><line class="device${live}" x1="${cx+10}" y1="${cy-12}" x2="${cx+10}" y2="${cy+12}"/>`);
+      out.push(`<title>${esc(n.raw)}</title>${operandLabel(label,cx,cy-17)}<line class="device${live}" x1="${cx-10}" y1="${cy-12}" x2="${cx-10}" y2="${cy+12}"/><line class="device${live}" x1="${cx+10}" y1="${cy-12}" x2="${cx+10}" y2="${cy+12}"/>`);
       if(n.op==='XIO') out.push(`<line class="device${live}" x1="${cx-14}" y1="${cy+14}" x2="${cx+14}" y2="${cy-14}"/>`);
       out.push(`<line class="wire${live}" x1="${wireL}" y1="${cy}" x2="${cx-10}" y2="${cy}"/><line class="wire${live}" x1="${cx+10}" y1="${cy}" x2="${wireR}" y2="${cy}"/>`); return;
     }
     if (['OTE','OTL','OTU'].includes(n.op)) {
       const mark=n.op==='OTE'?'':n.op==='OTL'?'L':'U';
-      out.push(`<title>${esc(n.raw)}</title><text class="label" x="${cx}" y="${cy-17}">${esc(label)}</text><path class="device${live}" d="M ${cx-15} ${cy-15} Q ${cx-25} ${cy} ${cx-15} ${cy+15} M ${cx+15} ${cy-15} Q ${cx+25} ${cy} ${cx+15} ${cy+15}"/><line class="wire${live}" x1="${wireL}" y1="${cy}" x2="${cx-21}" y2="${cy}"/><line class="wire${live}" x1="${cx+21}" y1="${cy}" x2="${wireR}" y2="${cy}"/><text class="label" x="${cx}" y="${cy+4}">${mark}</text>`); return;
+      out.push(`<title>${esc(n.raw)}</title>${operandLabel(label,cx,cy-17)}<path class="device${live}" d="M ${cx-15} ${cy-15} Q ${cx-25} ${cy} ${cx-15} ${cy+15} M ${cx+15} ${cy-15} Q ${cx+25} ${cy} ${cx+15} ${cy+15}"/><line class="wire${live}" x1="${wireL}" y1="${cy}" x2="${cx-21}" y2="${cy}"/><line class="wire${live}" x1="${cx+21}" y1="${cy}" x2="${wireR}" y2="${cy}"/><text class="label" x="${cx}" y="${cy+4}">${mark}</text>`); return;
     }
     if (['ONS','OSR','OSF'].includes(n.op)) {
-      out.push(`<text class="label" x="${cx}" y="${cy-24}">${esc(label)}</text><rect class="block" x="${cx-23}" y="${cy-15}" width="46" height="30"/><text class="op" x="${cx}" y="${cy+3}">${n.op}</text><line class="wire" x1="${wireL}" y1="${cy}" x2="${cx-23}" y2="${cy}"/><line class="wire" x1="${cx+23}" y1="${cy}" x2="${wireR}" y2="${cy}"/>`); return;
+      out.push(`${operandLabel(label,cx,cy-24)}<rect class="block" x="${cx-23}" y="${cy-15}" width="46" height="30"/><text class="op" x="${cx}" y="${cy+3}">${n.op}</text><line class="wire" x1="${wireL}" y1="${cy}" x2="${cx-23}" y2="${cy}"/><line class="wire" x1="${cx+23}" y1="${cy}" x2="${wireR}" y2="${cy}"/>`); return;
     }
     if (n.op === 'JSR') {
       const fields=[['Routine Name',n.args[0]||'?'],['Input Par',n.args[1]||''],['Return Par',n.args[2]||'']];
